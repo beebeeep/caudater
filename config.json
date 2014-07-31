@@ -1,0 +1,13 @@
+{
+    "general": {
+        "port": 89,
+        "daemon": "no"
+    },
+    "files": [
+    {"./tmp": {
+                  "type": "lastvalue",
+                  "grep": "200"
+              }}
+    ]
+}
+
