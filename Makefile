@@ -1,5 +1,5 @@
 TARGET=caudater
-LIBS=-lm
+LIBS=-lm -lconfig -lpthread
 
 CC=gcc
 LD=gcc

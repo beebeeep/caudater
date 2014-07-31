@@ -3,31 +3,9 @@
 #include <string.h>
 #include <libconfig.h>
 
+#include "caudater.h"
 
-#define TYPE_LASTVALUE 0
-#define TYPE_COUNTLINES 1
-#define TYPE_AVGCOUNT 2
-
-
-struct parser_var {
-    char name[128];
-    char pattern[256];
-    unsigned avg_period;
-    unsigned interval;
-    int type;
-};
-
-struct parser {
-    char filename[1024]; 
-    struct parser_var *vars;
-    unsigned vars_count;
-};
-
-int bind_port;
-int daemonize;
-struct parser *parsers;
-
-void copy_setting(config_setting_t *setting, const char *key, char dst[]) 
+void copy_setting(config_setting_t *setting, const char *key, void *dst, unsigned type) 
 {
   const char *value;
   int found = config_setting_lookup_string(setting, key, &value);
@@ -35,48 +13,55 @@ void copy_setting(config_setting_t *setting, const char *key, char dst[])
     fprintf(stderr, "Cannot find setting '%s'\n", key);
     exit(-1);
   }
-  strncpy(dst, value, sizeof(dst));
+  if (type == T_STRING) {
+      strncpy((char *)dst, value, 255);
+  } else if (type == T_INT) {
+      *(int *)dst = atoi(value);
+  } else if (type == T_FLOAT) { 
+      *(float *)dst = atof(value);
+  }
+
 }
 
-int main(int argc, char **argv)
+struct daemon_config parse_config(char *config_filename)
 {
-    /* используются свои типы. */
     config_t cfg; 
     config_setting_t *setting;
-    const char *str;
+    struct daemon_config config;
 
-    config_init(&cfg); /* обязательная инициализация */
 
-    /* Читаем файл. Если ошибка, то завершаем работу */
-    if(! config_read_file(&cfg, "config.conf"))
+    config_init(&cfg); 
+    if(! config_read_file(&cfg, config_filename))
     {
         fprintf(stderr, "%s:%d - %s\n", config_error_file(&cfg),
                 config_error_line(&cfg), config_error_text(&cfg));
         config_destroy(&cfg);
-        return(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
     }
 
     setting = config_lookup(&cfg, "general.port");
     if (setting == NULL) {
         perror("port not specified!");
     } else {
-        bind_port = config_setting_get_int(setting);
+        config.port = config_setting_get_int(setting);
     }
     setting = config_lookup(&cfg, "general.daemon");
     if (setting == NULL) {
         perror("daemon not specified!");
     } else {
-        daemonize = config_setting_get_bool(setting);
+        config.daemonize = config_setting_get_bool(setting);
     }
 
     setting = config_lookup(&cfg, "files");
     int files_count = config_setting_length(setting);
-    parsers = (struct parser *)malloc(files_count * sizeof(struct parser));
+
+    struct parser *parsers = (struct parser *)malloc(files_count * sizeof(struct parser));
+
     int i;
     for (i = 0; i < files_count; i++) {
         config_setting_t *file = config_setting_get_elem(setting, i);
-        copy_setting(file, "path", parsers[i].filename);
-        printf("Processing file %s\n", parsers[i].filename);
+        copy_setting(file, "path", parsers[i].source, T_STRING);
+        printf("Processing file %s\n", parsers[i].source);
 
         config_setting_t *vars = config_setting_get_member(file, "vars");
         parsers[i].vars_count = config_setting_length(vars);
@@ -85,20 +70,29 @@ int main(int argc, char **argv)
         for (j = 0; j < parsers[i].vars_count; j++) {
             struct parser_var *v = &parsers[i].vars[j];
             config_setting_t *var = config_setting_get_elem(vars, j);
-            const char *pattern, *type;
-            copy_setting(var, "name", v->name);
+            const char *type;
+            copy_setting(var, "name", v->name, T_STRING);
             config_setting_lookup_string(var, "type", &type);
             printf("\tprocessing var %s of type %s\n", v->name, type);
+
             if(!strcmp(type, "lastvalue")) {
                 v->type = TYPE_LASTVALUE;
-            } else if (!strcmp(type, "countlines")) {
-                v->type = TYPE_COUNTLINES;
-                copy_setting(var, "pattern", v->pattern);
-            } else if (!strcmp(type, "avgcount")) {
-                v->type = TYPE_AVGCOUNT;
-                copy_setting(var, "pattern", v->pattern);
+                copy_setting(var, "pattern", v->pattern, T_STRING);
+            } else if (!strcmp(type, "rps")) {
+                v->type = TYPE_RPS;
+                copy_setting(var, "pattern", v->pattern, T_STRING);
+                copy_setting(var, "interval", &v->interval, T_INT);
+            } else if (!strcmp(type, "summ")) {
+                v->type = TYPE_SUMM;
+                copy_setting(var, "pattern", v->pattern, T_STRING);
+            } else if (!strcmp(type, "count")) {
+                v->type = TYPE_COUNT;
+                copy_setting(var, "pattern", v->pattern, T_STRING);
             }
         }
     }
-    return 0;
+
+    config.file_parsers = parsers;
+    config.cmd_parsers = NULL;
+    return config;
 }
