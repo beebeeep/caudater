@@ -9,6 +9,7 @@
 #define T_INT       1
 #define T_FLOAT     2
 
+#define BUFF_SIZE 4096
 
 struct metric {
     char name[128];             /* variable name */

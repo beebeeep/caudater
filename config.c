@@ -78,6 +78,7 @@ struct daemon_config parse_config(char *config_filename)
         int j;
         for (j = 0; j < parsers[i].metrics_count; j++) {
             struct metric *v = &parsers[i].metrics[j];
+            v->interval = 0;
             config_setting_t *var = config_setting_get_elem(metrics, j);
             const char *type;
             copy_setting(var, "name", v->name, T_STRING);
@@ -110,6 +111,25 @@ struct daemon_config parse_config(char *config_filename)
             if (pcre_error != NULL) {
                 printf("Errors studying pattern: %s\n", pcre_error);
                 exit(1);
+            }
+            v->last_updated = 0;
+            switch(v->type) {
+                case TYPE_COUNT:
+                    v->acc = NULL;
+                    v->result = malloc(sizeof(unsigned long));
+                    break;
+                case TYPE_LASTVALUE: 
+                    v->acc = NULL;
+                    v->result = malloc(BUFF_SIZE);
+                    break;
+                case TYPE_RPS: 
+                    v->acc = malloc(sizeof(double));
+                    v->result = malloc(sizeof(double));
+                    break;
+                case TYPE_SUMM: 
+                    v->acc = malloc(sizeof(double));
+                    v->result = malloc(sizeof(double));
+                    break;
             }
         }
     }
