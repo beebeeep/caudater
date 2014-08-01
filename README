@@ -1,0 +1,4 @@
+caudater is tailer-like daemon that reads files (namely, the logfiles) and processing them someways,
+counting defined metrics (e.g. sum, count, RPS) in real time. It can be useful as a part of some monitoring system. 
+
+caudater is intended to be lightweight and fast.
