@@ -10,18 +10,22 @@
 #define T_FLOAT     2
 
 
-struct parser_var {
-    char name[128];
-    char pattern[256];
-    unsigned avg_period;
-    unsigned interval;
-    int type;
+struct metric {
+    char name[128];             /* variable name */
+    int type;                   /* variable type */
+    char pattern[256];          /* regexp for input filtering */
+    pcre *re;
+    pcre_extra *re_extra;
+    unsigned interval;          /* time window for counting rps */
+    void *acc;                  /* accumulator (for counting rps etc) */
+    void *result;               /* here stores current value */
+    time_t last_updated;
 };
 
 struct parser {
     char source[1024]; 
-    struct parser_var *vars;
-    unsigned vars_count;
+    struct metric *metrics;
+    unsigned metrics_count;
 };
 
 struct daemon_config {

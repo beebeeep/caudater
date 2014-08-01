@@ -2,23 +2,32 @@
 #include <stdlib.h>
 #include <string.h>
 #include <libconfig.h>
+#include <pcre.h>
 
 #include "caudater.h"
 
 void copy_setting(config_setting_t *setting, const char *key, void *dst, unsigned type) 
 {
-  const char *value;
-  int found = config_setting_lookup_string(setting, key, &value);
-  if (found == CONFIG_FALSE) {
-    fprintf(stderr, "Cannot find setting '%s'\n", key);
-    exit(-1);
-  }
   if (type == T_STRING) {
+      const char *value;
+      int found = config_setting_lookup_string(setting, key, &value);
+      if (found == CONFIG_FALSE) {
+        fprintf(stderr, "Cannot find setting '%s'\n", key);
+        exit(-1);
+      }
       strncpy((char *)dst, value, 255);
   } else if (type == T_INT) {
-      *(int *)dst = atoi(value);
+      int found = config_setting_lookup_int(setting, key, (int *)dst);
+      if (found == CONFIG_FALSE) {
+        fprintf(stderr, "Cannot find setting '%s'\n", key);
+        exit(-1);
+      }
   } else if (type == T_FLOAT) { 
-      *(float *)dst = atof(value);
+      int found = config_setting_lookup_float(setting, key, (double *)dst);
+      if (found == CONFIG_FALSE) {
+        fprintf(stderr, "Cannot find setting '%s'\n", key);
+        exit(-1);
+      }
   }
 
 }
@@ -63,13 +72,13 @@ struct daemon_config parse_config(char *config_filename)
         copy_setting(file, "path", parsers[i].source, T_STRING);
         printf("Processing file %s\n", parsers[i].source);
 
-        config_setting_t *vars = config_setting_get_member(file, "vars");
-        parsers[i].vars_count = config_setting_length(vars);
-        parsers[i].vars = (struct parser_var *)malloc(sizeof(struct parser_var) * parsers[i].vars_count);
+        config_setting_t *metrics = config_setting_get_member(file, "metrics");
+        parsers[i].metrics_count = config_setting_length(metrics);
+        parsers[i].metrics = (struct metric *)malloc(sizeof(struct metric) * parsers[i].metrics_count);
         int j;
-        for (j = 0; j < parsers[i].vars_count; j++) {
-            struct parser_var *v = &parsers[i].vars[j];
-            config_setting_t *var = config_setting_get_elem(vars, j);
+        for (j = 0; j < parsers[i].metrics_count; j++) {
+            struct metric *v = &parsers[i].metrics[j];
+            config_setting_t *var = config_setting_get_elem(metrics, j);
             const char *type;
             copy_setting(var, "name", v->name, T_STRING);
             config_setting_lookup_string(var, "type", &type);
@@ -88,6 +97,19 @@ struct daemon_config parse_config(char *config_filename)
             } else if (!strcmp(type, "count")) {
                 v->type = TYPE_COUNT;
                 copy_setting(var, "pattern", v->pattern, T_STRING);
+            }
+
+            const char *pcre_error;
+            int pcre_erroffset;
+            v->re = pcre_compile(v->pattern, PCRE_UTF16, &pcre_error, &pcre_erroffset, NULL);    
+            if (v->re == NULL) {
+                printf("PCRE compilation failed at offset %d: %s\n", pcre_erroffset, pcre_error);
+                exit(1);
+            }
+            v->re_extra = pcre_study(v->re, 0, &pcre_error);
+            if (pcre_error != NULL) {
+                printf("Errors studying pattern: %s\n", pcre_error);
+                exit(1);
             }
         }
     }
