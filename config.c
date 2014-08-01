@@ -92,8 +92,8 @@ struct daemon_config parse_config(char *config_filename)
                 v->type = TYPE_RPS;
                 copy_setting(var, "pattern", v->pattern, T_STRING);
                 copy_setting(var, "interval", &v->interval, T_INT);
-            } else if (!strcmp(type, "summ")) {
-                v->type = TYPE_SUMM;
+            } else if (!strcmp(type, "sum")) {
+                v->type = TYPE_SUM;
                 copy_setting(var, "pattern", v->pattern, T_STRING);
             } else if (!strcmp(type, "count")) {
                 v->type = TYPE_COUNT;
@@ -126,7 +126,7 @@ struct daemon_config parse_config(char *config_filename)
                     v->acc = malloc(sizeof(double));
                     v->result = malloc(sizeof(double));
                     break;
-                case TYPE_SUMM: 
+                case TYPE_SUM: 
                     v->acc = malloc(sizeof(double));
                     v->result = malloc(sizeof(double));
                     break;

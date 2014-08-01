@@ -3,7 +3,7 @@
 #define TYPE_LASTVALUE      0
 #define TYPE_COUNT          1
 #define TYPE_RPS            2
-#define TYPE_SUMM           3
+#define TYPE_SUM            3
 
 #define T_STRING    0
 #define T_INT       1
