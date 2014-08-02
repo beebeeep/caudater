@@ -3,7 +3,7 @@ LIBS=-lm -lconfig -lpthread -lpcre
 
 CC=gcc
 LD=gcc
-CFLAGS=-std=gnu99 -Wall -pedantic -g
+CFLAGS=-std=gnu99 -Wall -pedantic -g 
 
 OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
 HEADERS = $(wildcard *.h)

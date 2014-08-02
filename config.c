@@ -83,7 +83,6 @@ struct daemon_config parse_config(char *config_filename)
             const char *type;
             copy_setting(var, "name", v->name, T_STRING);
             config_setting_lookup_string(var, "type", &type);
-            printf("\tprocessing var %s of type %s\n", v->name, type);
 
             if(!strcmp(type, "lastvalue")) {
                 v->type = TYPE_LASTVALUE;
@@ -99,6 +98,8 @@ struct daemon_config parse_config(char *config_filename)
                 v->type = TYPE_COUNT;
                 copy_setting(var, "pattern", v->pattern, T_STRING);
             }
+
+            printf("\tprocessing var %s of type %s with pattern '%s'\n", v->name, type, v->pattern);
 
             const char *pcre_error;
             int pcre_erroffset;
@@ -117,6 +118,7 @@ struct daemon_config parse_config(char *config_filename)
                 case TYPE_COUNT:
                     v->acc = NULL;
                     v->result = malloc(sizeof(unsigned long));
+                    *((unsigned long *)v->result) = 0;
                     break;
                 case TYPE_LASTVALUE: 
                     v->acc = NULL;
@@ -125,10 +127,12 @@ struct daemon_config parse_config(char *config_filename)
                 case TYPE_RPS: 
                     v->acc = malloc(sizeof(double));
                     v->result = malloc(sizeof(double));
+                    *((double *)v->result) = 0.0;
                     break;
                 case TYPE_SUM: 
                     v->acc = malloc(sizeof(double));
                     v->result = malloc(sizeof(double));
+                    *((double *)v->result) = 0.0;
                     break;
             }
         }
