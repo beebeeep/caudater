@@ -8,9 +8,9 @@
 #include <string.h>
 #include <time.h>
 #include <sys/select.h>
+#include <errno.h>
 
 #include "caudater.h"
-
 
 void process_metric(struct metric *metric, char *line)
 {
@@ -21,27 +21,48 @@ void process_metric(struct metric *metric, char *line)
     }
     rc = pcre_exec(metric->re, metric->re_extra, line, strlen(line), 0, 0, ovector, 30);
     if(rc > 0) {
+        printf("%s", line);
         switch(metric->type) {
-            case TYPE_LASTVALUE: {
-                                     size_t len = ovector[3] - ovector[2];
-                                     if(len > BUFF_SIZE - 1) {
-                                         len = BUFF_SIZE - 1;
-                                     }
-                                     memcpy(metric->result, line + ovector[2], len);
-                                     ((char *)metric->result)[len] = '\0';
-                                     printf("Last value: '%s'\n", (char *)metric->result);
-                                 } break;
-            case TYPE_RPS: {
-                               time_t tdiff = time(NULL) - metric->last_updated;
-                               if(tdiff > metric->interval - 1) {
-                                   *((double *)metric->result) = (*((double *)metric->acc)+1.0)/tdiff;
-                                   *((double *)metric->acc) = 0.0;
-                                   metric->last_updated = time(NULL);
-                                   printf("RPS: %f\n", *((double *)metric->result));
-                               } else {
-                                   *((double *)metric->acc) += 1.0;
-                               }
-                           } break;
+            case TYPE_LASTVALUE: 
+                {
+                    size_t len = ovector[3] - ovector[2];
+                    if(len > BUFF_SIZE - 1) {
+                        len = BUFF_SIZE - 1;
+                    }
+                    memcpy(metric->result, line + ovector[2], len);
+                    ((char *)metric->result)[len] = '\0';
+                    printf("Last value: '%s'\n", (char *)metric->result);
+                } break;
+            case TYPE_SUM: 
+                {
+                    char match[BUFF_SIZE];
+                    size_t len = ovector[3] - ovector[2];
+                    if(len > BUFF_SIZE - 1) {
+                        len = BUFF_SIZE - 1;
+                    }
+                    memcpy(match, line + ovector[2], len);
+                    match[len] = '\0';
+                    errno = 0;
+                    double result = strtod(match, NULL);
+                    if (errno == 0) {
+                        *((double *)metric->result) += result;
+                    } else {
+                        printf("error\n");
+                    }
+                    printf("Summ: '%f'\n", *((double *)metric->result));
+                } break;
+            case TYPE_RPS: 
+                {
+                    time_t tdiff = time(NULL) - metric->last_updated;
+                    if(tdiff > metric->interval - 1) {
+                        *((double *)metric->result) = (*((double *)metric->acc)+1.0)/tdiff;
+                        *((double *)metric->acc) = 0.0;
+                        metric->last_updated = time(NULL);
+                        printf("RPS: %f\n", *((double *)metric->result));
+                    } else {
+                        *((double *)metric->acc) += 1.0;
+                    }
+                } break;
         }
     } 
 }
