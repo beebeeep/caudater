@@ -117,6 +117,7 @@ struct daemon_config parse_config(char *config_filename)
                 case TYPE_COUNT:
                     v->acc = NULL;
                     v->result = malloc(sizeof(unsigned long));
+                    *((unsigned long *)v->result) = 0;
                     break;
                 case TYPE_LASTVALUE: 
                     v->acc = NULL;
@@ -125,10 +126,12 @@ struct daemon_config parse_config(char *config_filename)
                 case TYPE_RPS: 
                     v->acc = malloc(sizeof(double));
                     v->result = malloc(sizeof(double));
+                    *((double *)v->result) = 0.0;
                     break;
                 case TYPE_SUM: 
                     v->acc = malloc(sizeof(double));
                     v->result = malloc(sizeof(double));
+                    *((double *)v->result) = 0.0;
                     break;
             }
         }

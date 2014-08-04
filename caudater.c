@@ -23,6 +23,11 @@ void process_metric(struct metric *metric, char *line)
     if(rc > 0) {
         printf("%s", line);
         switch(metric->type) {
+            case TYPE_COUNT: 
+                {
+                    *((unsigned long *)metric->result) += 1;
+                    printf("Count: '%lu'\n", *((unsigned long *)metric->result));
+                } break;
             case TYPE_LASTVALUE: 
                 {
                     size_t len = ovector[3] - ovector[2];
