@@ -15,9 +15,8 @@
 void process_metric(struct metric *metric, char *line)
 {
     int ovector[30];
-    int rc;
+    int rc = 0;
     if(line != NULL) {
-        printf("processing %s",line);
         rc = pcre_exec(metric->re, metric->re_extra, line, strlen(line), 0, 0, ovector, 30);
     }
     if(rc > 0 || (line == NULL && metric->type == TYPE_RPS) ) {
@@ -58,8 +57,8 @@ void process_metric(struct metric *metric, char *line)
             case TYPE_RPS: 
                 {
                     time_t tdiff = time(NULL) - metric->last_updated;
-                    if(tdiff > metric->interval - 1) {
-                        *((double *)metric->result) = (*((double *)metric->acc)+1.0)/tdiff;
+                    if(tdiff >= metric->interval) {
+                        *((double *)metric->result) = (*((double *)metric->acc))/tdiff;
                         *((double *)metric->acc) = 0.0;
                         metric->last_updated = time(NULL);
                         printf("RPS: %f\n", *((double *)metric->result));
@@ -102,23 +101,24 @@ void file_parser (struct parser *parser)
     }
     /* we will use select on inotify fd to recount rps after specified interval */
     fd_set rfds;
-    FD_ZERO(&rfds);
-    FD_SET(ifd, &rfds);
-    struct timeval tv, *timeout = &tv;
+    struct timeval tv, *timeout;
     int ready;
 
     while(1) {
         if(min_interval != 0) {
+            timeout = &tv;
             timeout->tv_sec = min_interval;
             timeout->tv_usec = 0;
         } else {
             timeout = NULL;
         }
+        FD_ZERO(&rfds);
+        FD_SET(ifd, &rfds);
         ready = select(ifd+1, &rfds, NULL, NULL, timeout);
         if(ready == -1) {
             perror("Error in select()");
             exit(-1);
-        } else if (ready) {
+        } else if (FD_ISSET(ifd, &rfds)) {
             read(ifd, &event, sizeof(event));
             if (event.mask & IN_MODIFY) {
                 /* got some data, read all lines and process all metrics for them 
@@ -131,8 +131,9 @@ void file_parser (struct parser *parser)
                     }
                 }
             }
-        } else {
+        } else if (ready == 0){
             /* no data within selected interval, firing DRY processing for counting RPS*/
+            printf("Timeout, dry run\n");
             for (i = 0; i < parser->metrics_count; i++) {
                 process_metric(&parser->metrics[i], NULL);
             }
