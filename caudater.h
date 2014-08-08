@@ -1,5 +1,8 @@
 #pragma once 
 
+#include <pcre.h>
+#include <pthread.h>
+
 #define TYPE_LASTVALUE      0
 #define TYPE_COUNT          1
 #define TYPE_RPS            2
@@ -25,6 +28,7 @@ struct metric {
 
 struct parser {
     char source[1024]; 
+    pthread_t thread_id;
     struct metric *metrics;
     unsigned metrics_count;
 };
@@ -32,7 +36,10 @@ struct parser {
 struct daemon_config {
     unsigned port;
     unsigned daemonize;
+    unsigned files_count;
+    unsigned cmd_count;
     struct parser *file_parsers;
+
     struct parser *cmd_parsers;
 };
 

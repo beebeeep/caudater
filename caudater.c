@@ -9,17 +9,19 @@
 #include <time.h>
 #include <sys/select.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include "caudater.h"
+#include "server.h"
 
 void process_metric(struct metric *metric, char *line)
 {
     int ovector[30];
     int rc = 0;
-    if(line != NULL) {
+    if (line != NULL) {
         rc = pcre_exec(metric->re, metric->re_extra, line, strlen(line), 0, 0, ovector, 30);
     }
-    if(rc > 0 || (line == NULL && metric->type == TYPE_RPS) ) {
+    if (rc > 0 || (line == NULL && metric->type == TYPE_RPS) ) {
         switch(metric->type) {
             case TYPE_COUNT: 
                 {
@@ -29,7 +31,7 @@ void process_metric(struct metric *metric, char *line)
             case TYPE_LASTVALUE: 
                 {
                     size_t len = ovector[3] - ovector[2];
-                    if(len > BUFF_SIZE - 1) {
+                    if (len > BUFF_SIZE - 1) {
                         len = BUFF_SIZE - 1;
                     }
                     memcpy(metric->result, line + ovector[2], len);
@@ -40,7 +42,7 @@ void process_metric(struct metric *metric, char *line)
                 {
                     char match[BUFF_SIZE];
                     size_t len = ovector[3] - ovector[2];
-                    if(len > BUFF_SIZE - 1) {
+                    if (len > BUFF_SIZE - 1) {
                         len = BUFF_SIZE - 1;
                     }
                     memcpy(match, line + ovector[2], len);
@@ -57,7 +59,7 @@ void process_metric(struct metric *metric, char *line)
             case TYPE_RPS: 
                 {
                     time_t tdiff = time(NULL) - metric->last_updated;
-                    if(tdiff >= metric->interval) {
+                    if (tdiff >= metric->interval) {
                         *((double *)metric->result) = (*((double *)metric->acc))/tdiff;
                         *((double *)metric->acc) = 0.0;
                         metric->last_updated = time(NULL);
@@ -69,8 +71,10 @@ void process_metric(struct metric *metric, char *line)
         }
     } 
 }
-void file_parser (struct parser *parser)
+void *file_parser (void *arg)
 {
+    struct parser *parser = (struct parser *) arg; 
+
     printf("Starting file_parser for for %s with %i metrics\n", parser->source, parser->metrics_count);
     if (access(parser->source, R_OK) != 0) {
         char msg[1024];
@@ -95,7 +99,7 @@ void file_parser (struct parser *parser)
 
     unsigned min_interval = parser->metrics[0].interval;
     for (i = 0; i < parser->metrics_count; i++) {
-        if(parser->metrics[i].interval < min_interval) {
+        if (parser->metrics[i].interval < min_interval) {
             min_interval = parser->metrics[i].interval;
         }
     }
@@ -105,7 +109,7 @@ void file_parser (struct parser *parser)
     int ready;
 
     while(1) {
-        if(min_interval != 0) {
+        if (min_interval != 0) {
             timeout = &tv;
             timeout->tv_sec = min_interval;
             timeout->tv_usec = 0;
@@ -115,7 +119,7 @@ void file_parser (struct parser *parser)
         FD_ZERO(&rfds);
         FD_SET(ifd, &rfds);
         ready = select(ifd+1, &rfds, NULL, NULL, timeout);
-        if(ready == -1) {
+        if (ready == -1) {
             perror("Error in select()");
             exit(-1);
         } else if (FD_ISSET(ifd, &rfds)) {
@@ -139,9 +143,9 @@ void file_parser (struct parser *parser)
             }
         }
     }
-
-
+    return NULL;
 }
+
 int main(int argc, char *argv[])
 {
     if (argc != 2) {
@@ -151,8 +155,15 @@ int main(int argc, char *argv[])
     
     struct daemon_config config = parse_config(argv[1]);
 
-    file_parser(&config.file_parsers[0]);
-
+    int i;
+    for (i = 0; i < config.files_count; i++) {
+        if (pthread_create(&config.file_parsers[i].thread_id, NULL, file_parser, (void *) &config.file_parsers[i]) != 0) {
+            perror("Cannot start thread");
+            exit(-1);
+        }
+    }
+    
+    start_server(&config);
     exit(0);
 
     return 0;

@@ -139,6 +139,8 @@ struct daemon_config parse_config(char *config_filename)
     }
 
     config.file_parsers = parsers;
+    config.files_count = files_count;
     config.cmd_parsers = NULL;
+    config.cmd_count = 0;
     return config;
 }
