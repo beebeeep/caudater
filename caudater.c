@@ -10,6 +10,7 @@
 #include <sys/select.h>
 #include <errno.h>
 #include <pthread.h>
+#include <linux/limits.h>
 
 #include "caudater.h"
 #include "server.h"
@@ -71,19 +72,37 @@ void process_metric(struct metric *metric, char *line)
         }
     } 
 }
+
+FILE *try_open(char *filename)
+{
+    char msg[PATH_MAX+30];
+    /* wait until we found readable file specified in config */
+    for (;;) {
+        if (access(filename, R_OK) != 0) {
+            snprintf(msg, PATH_MAX+30, "Error reading '%s'", filename);
+            perror(msg);
+            struct timespec t = {.tv_sec = 1, .tv_nsec = 0}, r;
+            nanosleep(&t, &r);
+        } else {
+            FILE *f = fopen(filename, "r");
+            if (f == NULL) {
+                snprintf(msg, PATH_MAX+30, "Error opening '%s'", filename);
+                perror(msg);
+            } else {
+                printf("Opened '%s' for parsing\n", filename);
+                return f;
+            }
+        }
+    }
+}
+
 void *file_parser (void *arg)
 {
     struct parser *parser = (struct parser *) arg; 
 
     printf("Starting file_parser for for %s with %i metrics\n", parser->source, parser->metrics_count);
-    if (access(parser->source, R_OK) != 0) {
-        char msg[1024];
-        snprintf(msg, 1024, "Error reading '%s'", parser->source);
-        perror(msg);
-        exit(-1);
-    }
 
-    FILE *file = fopen(parser->source, "r");
+    FILE *file = try_open(parser->source);
     char *line;
     size_t bytes;
     int i;
@@ -91,7 +110,7 @@ void *file_parser (void *arg)
     /* setup inotify under watched file */
     int ifd = inotify_init();
     struct inotify_event event;
-    int iwd = inotify_add_watch(ifd, parser->source, IN_MODIFY);
+    int iwd = inotify_add_watch(ifd, parser->source, IN_MODIFY|IN_DELETE_SELF|IN_MOVE_SELF);
     if (iwd < 0) {
         perror("Cannot add watch");
         exit(-1);
@@ -133,6 +152,16 @@ void *file_parser (void *arg)
                     for (i = 0; i < parser->metrics_count; i++) {
                         process_metric(&parser->metrics[i], line);
                     }
+                }
+            } else if (event.mask & (IN_MOVE_SELF | IN_DELETE_SELF)) {
+                /* file was deleted or moved by logrotate or someone else, try to reopen it and add new watch */
+                printf("File '%s' was moved or deleted, trying to reopen\n", parser->source);
+                inotify_rm_watch(ifd, iwd);
+                file = try_open(parser->source);
+                iwd = inotify_add_watch(ifd, parser->source, IN_MODIFY|IN_DELETE_SELF|IN_MOVE_SELF);
+                if (iwd < 0) {
+                    perror("Cannot add watch");
+                    exit(-1);
                 }
             }
         } else if (ready == 0){

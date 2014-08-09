@@ -11,13 +11,6 @@
 
 #include "caudater.h"
 
-
-/**************
- * TODO 
- *
- * this shit is leaking somewhere...
- * and we need signal handling 
- */
 struct responder_param {
   int fd;
   pthread_t thread_id;
