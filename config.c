@@ -103,7 +103,7 @@ struct daemon_config parse_config(char *config_filename)
 
             const char *pcre_error;
             int pcre_erroffset;
-            v->re = pcre_compile(v->pattern, PCRE_UTF16, &pcre_error, &pcre_erroffset, NULL);    
+            v->re = pcre_compile(v->pattern, PCRE_UTF8, &pcre_error, &pcre_erroffset, NULL);    
             if (v->re == NULL) {
                 printf("PCRE compilation failed at offset %d: %s\n", pcre_erroffset, pcre_error);
                 exit(1);
