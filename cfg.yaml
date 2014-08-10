@@ -1,0 +1,79 @@
+general:
+    port: 1488
+    daemonize: true
+
+parsers:
+    /var/log/nginx/mpfs/access.log:
+        type: file
+        metrics:
+            mqps:
+                pattern: .*
+                type: rps
+                interval: 10
+            m5xx:
+                pattern: HTTP/1.[0-1]" 50[0-6]+
+                type: count
+
+
+############################################
+#
+#
+#  STREAM START
+#  [Block mapping]
+#  (Key token)   scalar general 
+#  (Value token) [Block mapping]
+#  (Key token)   scalar port 
+#  (Value token) scalar 1488 
+#  (Key token)   scalar daemonize 
+#  (Value token) scalar true 
+#  <b>End block</b>
+#  (Key token)   scalar parsers 
+#  (Value token) [Block mapping]
+#  (Key token)   scalar /var/log/nginx/mpfs/access.log 
+#  (Value token) [Block mapping]
+#  (Key token)   scalar type 
+#  (Value token) scalar file 
+#  (Key token)   scalar metrics 
+#  (Value token) [Block mapping]
+#  (Key token)   scalar mqps 
+#  (Value token) [Block mapping]
+#  (Key token)   scalar pattern 
+#  (Value token) scalar .* 
+#  (Key token)   scalar type 
+#  (Value token) scalar rps 
+#  (Key token)   scalar interval 
+#  (Value token) scalar 10 
+#  <b>End block</b>
+#  (Key token)   scalar m5xx 
+#  (Value token) [Block mapping]
+#  (Key token)   scalar pattern 
+#  (Value token) scalar HTTP/1.[0-1]" 50[0-6]+ 
+#  (Key token)   scalar type 
+#  (Value token) scalar count 
+#  <b>End block</b>
+#  <b>End block</b>
+#  <b>End block</b>
+#  <b>End block</b>
+#  <b>End block</b>
+#  STREAM END
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+

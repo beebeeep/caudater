@@ -12,6 +12,9 @@
 #define T_INT       1
 #define T_FLOAT     2
 
+#define PT_FILE 0
+#define PT_CMD 1 
+
 #define BUFF_SIZE 4096
 
 struct metric {
@@ -28,6 +31,7 @@ struct metric {
 
 struct parser {
     char source[1024]; 
+    int type;
     pthread_t thread_id;
     struct metric *metrics;
     unsigned metrics_count;
@@ -36,11 +40,8 @@ struct parser {
 struct daemon_config {
     unsigned port;
     unsigned daemonize;
-    unsigned files_count;
-    unsigned cmd_count;
-    struct parser *file_parsers;
-
-    struct parser *cmd_parsers;
+    unsigned parsers_count;
+    struct parser *parsers;
 };
 
 struct daemon_config parse_config(char *config_filename);
