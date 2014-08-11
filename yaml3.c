@@ -1,10 +1,19 @@
 #include <stdio.h>
 #include <yaml.h>
 
+#define MAX_ELEM_COUNT 1024
+
+/* struct for keeping tree elements parent stack */
 typedef struct elem_t {
     void *value;
     struct elem_t *parent;
 } elem;
+
+typedef struct kv_elem_t {
+    char *key;
+    char *value;
+    struct kv_elem_t *parent;
+} kv_elem;
 
 /* takes element to push and stack head poiner, return new stack head */
 elem *push(void *m, elem *stack) 
@@ -25,6 +34,18 @@ void *pop(elem **stack)
     return value;
 }
 
+void get_elem_by_parent_value(elem *tree[], size_t count, char *value)
+{
+    size_t i;
+    for (i = 0; i < count; i++) {
+        if(tree[i]->parent == NULL) continue;
+        if(!strcmp(value, tree[i]->parent->value)) {
+            printf("Found elem %s for parent %s\n", tree[i]->value, value);
+        }
+    }
+}
+
+
 int main(void)
 {
     FILE *fh = fopen("cfg.yaml", "r");
@@ -40,11 +61,17 @@ int main(void)
     /* Set input file */
     yaml_parser_set_input_file(&parser, fh);
 
-    elem *top_elem = (elem *)malloc(sizeof(elem));
-    top_elem->value = NULL; top_elem->parent = NULL; 
-    elem *curr_elem = top_elem;
+    kv_elem *top_elem = (kv_elem *)malloc(sizeof(elem));
+    top_elem->key = "HEAD"; top_elem->value = NULL; top_elem->parent = NULL; 
+    kv_elem *curr_elem = top_elem;
 
     elem *parent_stack = push(top_elem, NULL);
+
+    kv_elem *tree[MAX_ELEM_COUNT];
+    tree[0] = top_elem;
+    unsigned elem_count = 1;
+
+    unsigned kv_parity = 0;
 
     /* START new code */
     do {
@@ -55,42 +82,38 @@ int main(void)
 
         switch(event.type)
         { 
-            case YAML_NO_EVENT: puts("No event!"); break;
-                                /* Stream start/end */
-            case YAML_STREAM_START_EVENT: puts("STREAM START"); break;
-            case YAML_STREAM_END_EVENT:   puts("STREAM END");   break;
-                                          /* Block delimeters */
-            case YAML_DOCUMENT_START_EVENT: puts("<b>Start Document</b>"); break;
-            case YAML_DOCUMENT_END_EVENT:   puts("<b>End Document</b>");   break;
+            case YAML_NO_EVENT:
+            case YAML_STREAM_START_EVENT:
+            case YAML_STREAM_END_EVENT:
+            case YAML_DOCUMENT_START_EVENT:
+            case YAML_DOCUMENT_END_EVENT:
             case YAML_SEQUENCE_START_EVENT: 
-                                            /* we don't need arrays */
-                                            puts("<b>Start Sequence</b>"); 
-                                            break;
             case YAML_SEQUENCE_END_EVENT:   
-                                            /* we don't need arrays */
-                                            puts("<b>End Sequence</b>");
-                                            break;
+            case YAML_ALIAS_EVENT:  
+                break;
             case YAML_MAPPING_START_EVENT:  
-                                            printf("Current elem %p pushed to %p\n", curr_elem, parent_stack);
+                                            kv_parity = 0;
                                             parent_stack = push(curr_elem, parent_stack);
-                                            puts("<b>Start Mapping</b>");
                                             break;
             case YAML_MAPPING_END_EVENT:    
+                                            kv_parity = 0;
                                             curr_elem = pop(&parent_stack);
-                                            printf("Current elem %p was popped from %p\n", curr_elem, parent_stack);
-                                            puts("<b>End Mapping</b>");    break;
-                                            /* Data */
-            case YAML_ALIAS_EVENT:  
-                                            /* i don't know what is this shit */
-                                            printf("Got alias (anchor %s)\n", event.data.alias.anchor); break;
+                                            break;
             case YAML_SCALAR_EVENT: 
-                                            elem *new = (elem *)malloc(sizeof(elem));
-                                            new->value = malloc(event.data.scalar.length);
-                                            memcpy(new->value, event.data.scalar.value, event.data.scalar.length);
-                                            new->parent = curr_elem;
-                                            curr_elem = new; 
+                                            if(kv_parity++ % 2 == 0) {      /* this is a key */
+                                                kv_elem *new_elem = (kv_elem *)malloc(sizeof(kv_elem));
+                                                new_elem->key = malloc(event.data.scalar.length);
+                                                new_elem->value = NULL;
+                                                memcpy(new_elem->key, event.data.scalar.value, event.data.scalar.length+1);
+                                                new_elem->parent = parent_stack->value;
+                                                tree[elem_count++] = new_elem; 
+                                                curr_elem = new_elem; 
+                                            } else {    /* this is a value */
+                                                curr_elem->value = malloc(event.data.scalar.length);
+                                                memcpy(curr_elem->value, event.data.scalar.value, event.data.scalar.length+1);
+                                            }
 
-                                            printf("Got scalar (value %s)\n", event.data.scalar.value); 
+
                                             break;
         }
         if(event.type != YAML_STREAM_END_EVENT)
@@ -102,6 +125,12 @@ int main(void)
     /* Cleanup */
     yaml_parser_delete(&parser);
     fclose(fh);
+
+    size_t i;
+    for (i = 0; i < elem_count; i++) { 
+        kv_elem *c = tree[i];
+        printf("Elem %p:\tkey=%s, value=%s, parent = %s\n", c, c->key, (c->value != NULL)?c->value:"NULL", (c->parent != NULL)?c->parent->key:"NULL");
+    }
     return 0;
 }
 
