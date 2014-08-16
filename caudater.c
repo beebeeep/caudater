@@ -185,8 +185,8 @@ int main(int argc, char *argv[])
     struct daemon_config config = parse_config(argv[1]);
 
     int i;
-    for (i = 0; i < config.files_count; i++) {
-        if (pthread_create(&config.file_parsers[i].thread_id, NULL, file_parser, (void *) &config.file_parsers[i]) != 0) {
+    for (i = 0; i < config.parsers_count; i++) {
+        if (pthread_create(&config.parsers[i].thread_id, NULL, file_parser, (void *) &config.parsers[i]) != 0) {
             perror("Cannot start thread");
             exit(-1);
         }

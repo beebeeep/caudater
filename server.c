@@ -20,10 +20,10 @@ struct responder_param {
 void *responder(void *p) 
 {
   struct responder_param *param = (struct responder_param *)p;
-  unsigned file, metric; 
+  unsigned i, metric; 
   char *buff = (char *)malloc(BUFF_SIZE);
-  for (file = 0; file < param->cfg->files_count; file++) {
-    struct parser *parser = &param->cfg->file_parsers[file];
+  for (i = 0; i < param->cfg->parsers_count; i++) {
+    struct parser *parser = &param->cfg->parsers[i];
     for (metric = 0; metric < parser->metrics_count; metric++) {
       struct metric *m  = &parser->metrics[metric];
       if (m->type == TYPE_LASTVALUE) {

@@ -18,9 +18,9 @@
 #define BUFF_SIZE 4096
 
 struct metric {
-    char name[128];             /* variable name */
+    char *name;                 /* variable name */
     int type;                   /* variable type */
-    char pattern[256];          /* regexp for input filtering */
+    char *pattern;              /* regexp for input filtering */
     pcre *re;
     pcre_extra *re_extra;
     unsigned interval;          /* time window for counting rps */
@@ -30,7 +30,7 @@ struct metric {
 };
 
 struct parser {
-    char source[1024]; 
+    char *source; 
     int type;
     pthread_t thread_id;
     struct metric *metrics;

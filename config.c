@@ -1,3 +1,4 @@
+#ifndef USE_YAML_CONFIG
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -144,3 +145,9 @@ struct daemon_config parse_config(char *config_filename)
     config.cmd_count = 0;
     return config;
 }
+#else
+
+void dummy(void) {
+}
+
+#endif

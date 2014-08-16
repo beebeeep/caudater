@@ -1,5 +1,10 @@
+#ifdef USE_YAML_CONFIG
 #include <stdio.h>
 #include <yaml.h>
+#include <string.h>
+#include <pcre.h>
+
+#include "caudater.h"
 
 #define MAX_ELEM_COUNT 1024
 
@@ -58,10 +63,25 @@ char * get_elem_by_key_parent(kv_elem *tree[], size_t count, char *key, char *pa
     return NULL;
 }
 
-
-int main(void)
+char *alloc_copy(char *str)
 {
-    FILE *fh = fopen("cfg.yaml", "r");
+    if (str == NULL) {
+        return NULL;
+    }
+    char *dest = (char *)malloc(strlen(str)+1);
+    strcpy(dest, str);
+    return dest;
+}
+
+
+struct daemon_config parse_config(char *config_filename)
+{
+    FILE *fh = fopen(config_filename, "r");
+
+    if (fh == NULL) {
+        perror("Error opening config file");
+        exit(-1);
+    }
     yaml_parser_t parser;
     yaml_event_t  event;   /* New variable */
 
@@ -140,26 +160,105 @@ int main(void)
     fclose(fh);
 
     size_t i;
-    daemon_config cfg;
+    struct daemon_config cfg;
     cfg.parsers_count = 0;
+    cfg.parsers = NULL;
+    struct parser *current_parser = NULL;
+    struct metric *current_metric = NULL;
+
     char *port = get_elem_by_key_parent(tree, elem_count,  "port", "general");
     if (port == NULL) {
         printf("Error parsing config: port not found\n");
         exit(-1);
+    } else {
+        cfg.port = atoi(port);
     }
     for (i = 0; i < elem_count; i++) { 
         kv_elem *c = tree[i];
-        printf("Elem %p:\tkey=%s, value=%s, parent = %s\n", c, c->key, (c->value != NULL)?c->value:"NULL", (c->parent != NULL)?c->parent->key:"NULL");
-        if(c->parent != NULL && !strcmp(c->parent->key, "parsers")) {
-            size_t c = cfg.parsers_count
-            cfg.parsers = (struct parser *)realloc(sizeof(struct parser) * c);
-            struct parser *p = &cfg.parsers[c]; 
-            p->source = (char *)malloc(strlen(c->key)+1);
-            strcpy(p->source, c->key);
+        printf("Elem %p:\tkey=%s, value=%s, parent = %s\n", (void *)c, c->key, (c->value != NULL)?c->value:"NULL", (c->parent != NULL)?c->parent->key:"NULL");
+        
+        if(c->parent == NULL) continue;
 
+        if(!strcmp(c->parent->key, "parsers")) {
+            cfg.parsers_count++;
+            cfg.parsers = (struct parser *)realloc(cfg.parsers, sizeof(struct parser) * cfg.parsers_count);
+            current_parser = &cfg.parsers[cfg.parsers_count-1]; 
+            current_parser->source = alloc_copy(c->key);
+            current_parser->metrics_count = 0;
+            printf("Found parser %s\n", current_parser->source);
 
-            
+            char *parser_type = get_elem_by_key_parent(tree, elem_count, "type", current_parser->source);
+            if (!strcmp(parser_type, "file")) {
+                current_parser->type = PT_FILE;
+            } else if (!strcmp(parser_type, "command")) {
+                current_parser->type = PT_CMD;
+            }
+        }
+
+        if(!strcmp(c->parent->key, "metrics")) {
+           current_parser->metrics_count++;
+           current_parser->metrics = (struct metric *)realloc(
+                   current_parser->metrics, 
+                   sizeof(struct metric)*current_parser->metrics_count);
+           current_metric = &current_parser->metrics[current_parser->metrics_count-1];
+           current_metric->name = alloc_copy(c->key);
+
+           char *pattern = get_elem_by_key_parent(tree, elem_count, "pattern", current_metric->name);
+           if(pattern == NULL) {
+               printf("Error parsing metric '%s' config: metric should have pattern!", current_metric->name);
+               exit(-1);
+           }
+           current_metric->pattern = alloc_copy(pattern);
+
+           char *interval = get_elem_by_key_parent(tree, elem_count, "interval", current_metric->name); 
+           if(interval != NULL) {
+               current_metric->interval = atoi(interval);
+           }
+           char *type = get_elem_by_key_parent(tree, elem_count, "type", current_metric->name);
+           if(type == NULL) {
+               printf("Error parsing metric '%s' config: metric should have type!", current_metric->name);
+               exit(-1);
+           }
+
+           if(!strcmp(type, "lastvalue")) {
+               current_metric->type = TYPE_LASTVALUE;
+               current_metric->acc = NULL;
+               current_metric->result = malloc(BUFF_SIZE);
+           } else if (!strcmp(type, "rps")) {
+               current_metric->type = TYPE_RPS;
+               current_metric->acc = malloc(sizeof(double));
+               current_metric->result = malloc(sizeof(double));
+               *((double *)current_metric->result) = 0.0;
+           } else if (!strcmp(type, "sum")) {
+               current_metric->type = TYPE_SUM;
+               current_metric->acc = malloc(sizeof(double));
+               current_metric->result = malloc(sizeof(double));
+               *((double *)current_metric->result) = 0.0;
+           } else if (!strcmp(type, "count")) {
+               current_metric->type = TYPE_COUNT;
+               current_metric->acc = NULL;
+               current_metric->result = malloc(sizeof(unsigned long));
+               *((unsigned long *)current_metric->result) = 0;
+           }
+
+           const char *pcre_error;
+           int pcre_erroffset;
+           current_metric->re = pcre_compile(current_metric->pattern, PCRE_UTF8, &pcre_error, &pcre_erroffset, NULL);    
+           if (current_metric->re == NULL) {
+               printf("PCRE compilation failed at offset %d: %s\n", pcre_erroffset, pcre_error);
+               exit(1);
+           }
+           current_metric->re_extra = pcre_study(current_metric->re, 0, &pcre_error);
+           if (pcre_error != NULL) {
+               printf("Errors studying pattern: %s\n", pcre_error);
+               exit(1);
+           }
+           current_metric->last_updated = 0;
+
+        }
     }
-    return 0;
+            
+    return cfg;
 }
 
+#endif
