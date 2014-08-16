@@ -34,15 +34,28 @@ void *pop(elem **stack)
     return value;
 }
 
-void get_elem_by_parent_value(elem *tree[], size_t count, char *value)
+char * get_elem_by_key(kv_elem *tree[], size_t count, char *key)
 {
     size_t i;
     for (i = 0; i < count; i++) {
-        if(tree[i]->parent == NULL) continue;
-        if(!strcmp(value, tree[i]->parent->value)) {
-            printf("Found elem %s for parent %s\n", tree[i]->value, value);
+        if(!strcmp(key, tree[i]->key)) {
+            return tree[i]->value;
         }
     }
+    return NULL;
+}
+
+char * get_elem_by_key_parent(kv_elem *tree[], size_t count, char *key, char *parent)
+{
+    size_t i;
+    for (i = 0; i < count; i++) {
+        if(tree[i]->parent != NULL && 
+                !strcmp(tree[i]->parent->key, parent) &&
+                !strcmp(key, tree[i]->key)) {
+            return tree[i]->value;
+        }
+    }
+    return NULL;
 }
 
 
@@ -127,9 +140,25 @@ int main(void)
     fclose(fh);
 
     size_t i;
+    daemon_config cfg;
+    cfg.parsers_count = 0;
+    char *port = get_elem_by_key_parent(tree, elem_count,  "port", "general");
+    if (port == NULL) {
+        printf("Error parsing config: port not found\n");
+        exit(-1);
+    }
     for (i = 0; i < elem_count; i++) { 
         kv_elem *c = tree[i];
         printf("Elem %p:\tkey=%s, value=%s, parent = %s\n", c, c->key, (c->value != NULL)?c->value:"NULL", (c->parent != NULL)?c->parent->key:"NULL");
+        if(c->parent != NULL && !strcmp(c->parent->key, "parsers")) {
+            size_t c = cfg.parsers_count
+            cfg.parsers = (struct parser *)realloc(sizeof(struct parser) * c);
+            struct parser *p = &cfg.parsers[c]; 
+            p->source = (char *)malloc(strlen(c->key)+1);
+            strcpy(p->source, c->key);
+
+
+            
     }
     return 0;
 }
