@@ -185,13 +185,16 @@ struct daemon_config parse_config(char *config_filename)
             current_parser = &cfg.parsers[cfg.parsers_count-1]; 
             current_parser->source = alloc_copy(c->key);
             current_parser->metrics_count = 0;
-            printf("Found parser %s\n", current_parser->source);
+            printf("Found parser '%s'\n", current_parser->source);
 
             char *parser_type = get_elem_by_key_parent(tree, elem_count, "type", current_parser->source);
             if (!strcmp(parser_type, "file")) {
                 current_parser->type = PT_FILE;
             } else if (!strcmp(parser_type, "command")) {
                 current_parser->type = PT_CMD;
+            } else {
+                printf("Unknown parser type '%s'!\n", parser_type);
+                exit(-1);
             }
         }
 
@@ -225,6 +228,10 @@ struct daemon_config parse_config(char *config_filename)
                current_metric->acc = NULL;
                current_metric->result = malloc(BUFF_SIZE);
            } else if (!strcmp(type, "rps")) {
+               if(current_parser->type == PT_CMD) {
+                   printf("Cannot use rps metric '%s'for command parser '%s'\n", current_metric->name, current_parser->source);
+                   exit(-1);
+               }
                current_metric->type = TYPE_RPS;
                current_metric->acc = malloc(sizeof(double));
                current_metric->result = malloc(sizeof(double));

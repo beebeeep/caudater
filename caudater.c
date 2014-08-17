@@ -96,6 +96,44 @@ FILE *try_open(char *filename)
     }
 }
 
+void *cmd_parser (void *arg)
+{
+    struct parser *parser = (struct parser *) arg; 
+
+    printf("Starting cmd_parser for for %s with %i metrics\n", parser->source, parser->metrics_count);
+
+    FILE *cmd_fd;
+    size_t bytes;
+    char *line = NULL;
+
+    unsigned min_interval = parser->metrics[0].interval, i;
+    for (i = 0; i < parser->metrics_count; i++) {
+        if (parser->metrics[i].interval < min_interval) {
+            min_interval = parser->metrics[i].interval;
+        }
+    }
+
+    for(;;) {
+        printf("Running command '%s'\n", parser->source);
+        cmd_fd = popen(parser->source, "r");
+        if(cmd_fd == NULL) {
+            perror("popen() failed");
+            return NULL;
+        }
+
+        while(getline(&line, &bytes, cmd_fd) != -1) {
+            printf("Got line '%s'\n", line);
+            for (i = 0; i < parser->metrics_count; i++) {
+                process_metric(&parser->metrics[i], line);
+            }
+        }
+        pclose(cmd_fd);
+        struct timespec t = {.tv_sec = min_interval, .tv_nsec = 0}, r;
+        nanosleep(&t, &r);
+    }
+
+}
+
 void *file_parser (void *arg)
 {
     struct parser *parser = (struct parser *) arg; 
@@ -186,7 +224,16 @@ int main(int argc, char *argv[])
 
     int i;
     for (i = 0; i < config.parsers_count; i++) {
-        if (pthread_create(&config.parsers[i].thread_id, NULL, file_parser, (void *) &config.parsers[i]) != 0) {
+        void *(*parser_worker) (void *);
+        if (config.parsers[i].type == PT_FILE) {
+            parser_worker = file_parser;
+        } else if (config.parsers[i].type == PT_CMD) {
+            parser_worker = cmd_parser;
+        } else {
+            printf ("Unknown parser type!\n");
+            exit(-1);
+        }
+        if (pthread_create(&config.parsers[i].thread_id, NULL, parser_worker, (void *) &config.parsers[i]) != 0) {
             perror("Cannot start thread");
             exit(-1);
         }
