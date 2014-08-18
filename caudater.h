@@ -41,6 +41,7 @@ struct daemon_config {
     unsigned port;
     unsigned daemonize;
     unsigned parsers_count;
+    int server_listenfd;
     struct parser *parsers;
 };
 

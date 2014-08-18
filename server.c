@@ -50,24 +50,23 @@ void *responder(void *p)
 void start_server(struct daemon_config *config)
 {
   struct sockaddr_in6 sin;
-  int listenfd;
   memset( &sin, 0, sizeof(sin) );
   sin.sin6_family = AF_INET6;    /* fuck IPv4, we're running at least on dualstack system */
   sin.sin6_addr = in6addr_any; 
   sin.sin6_port = htons( config->port );
 
-  listenfd = socket(AF_INET6, SOCK_STREAM, 0);
-  if (listenfd < 0) {
+  config->server_listenfd = socket(AF_INET6, SOCK_STREAM, 0);
+  if (config->server_listenfd < 0) {
     perror("Cannot create socket");
     exit(-1);
   }
 
-  if (bind(listenfd, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
+  if (bind(config->server_listenfd, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
     perror("Cannot bind socket");
     exit(-1);
   }
 
-  if (listen(listenfd, 10) < 0) {
+  if (listen(config->server_listenfd, 10) < 0) {
     perror("Cannot start listen()");
     exit(-1);
   }
@@ -77,7 +76,7 @@ void start_server(struct daemon_config *config)
   pthread_attr_t attr;
 
   for(;;) {
-    connfd = accept(listenfd, (struct sockaddr *)NULL, NULL);
+    connfd = accept(config->server_listenfd, (struct sockaddr *)NULL, NULL);
     if(connfd >= 0) {
       struct responder_param *param = (struct responder_param *)malloc(sizeof(struct responder_param));
       param->fd = connfd;

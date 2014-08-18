@@ -11,9 +11,23 @@
 #include <errno.h>
 #include <pthread.h>
 #include <linux/limits.h>
+#include <signal.h>
 
 #include "caudater.h"
 #include "server.h"
+
+struct daemon_config config;
+
+void *sig_handler(void *arg)
+{
+    sigset_t *set = arg;
+    int sig;
+
+    sigwait(set, &sig);
+    printf("Signal handling thread got signal %d\n", sig);
+    close(config.server_listenfd);
+    exit(0);
+}
 
 void process_metric(struct metric *metric, char *line)
 {
@@ -220,7 +234,24 @@ int main(int argc, char *argv[])
         exit(1);
     }
     
-    struct daemon_config config = parse_config(argv[1]);
+    config = parse_config(argv[1]);
+
+    int r;
+    sigset_t set;
+    pthread_t sig_thread;
+    sigemptyset(&set);
+    sigaddset(&set, SIGQUIT);
+    sigaddset(&set, SIGINT);
+    sigaddset(&set, SIGTERM);
+    r = pthread_sigmask(SIG_BLOCK, &set, NULL);
+    if (r != 0) {
+       perror("Cannot set sigmask");
+       exit(-1);
+    }
+    if (pthread_create(&sig_thread, NULL, &sig_handler, (void *) &set) != 0) {
+        perror("Cannot start thread");
+        exit(-1);
+    }
 
     int i;
     for (i = 0; i < config.parsers_count; i++) {
@@ -238,6 +269,7 @@ int main(int argc, char *argv[])
             exit(-1);
         }
     }
+
     
     start_server(&config);
     exit(0);
