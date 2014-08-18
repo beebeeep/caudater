@@ -3,13 +3,38 @@ general:
     daemonize: true
 
 parsers:
-    /var/log/nginx/mpfs/access.log:
+    'cat /proc/loadavg':
+        type: command
+        metrics:
+            la:
+                type: lastvalue
+                interval: 2
+                pattern: '^([0-9.]+) '
+
+    'curl -m 5 "http://127.0.0.1/queue/count"':
+        type: command
+        metrics:
+            queue:
+                type: lastvalue
+                interval: 15
+                pattern: '\d+'
+#
+#    'curl -m 5 http://127.0.0.1/queue/count?queue=queue-index"':
+#        type: command
+#        metrics:
+#            squeue:
+#                type: lastvalue
+#                interval: 15
+#                pattern: '\d+'
+
+    '/var/log/nginx/mpfs/access.log':
         type: file
         metrics:
             mqps:
-                pattern: .*
                 type: rps
+                pattern: '(.*)'
                 interval: 10
             m5xx:
-                pattern: HTTP/1.[0-1]" 50[0-6]+
-                type: count
+                type: rps
+                pattern: '(HTTP/1.[0-1]\" 50[0-6]+)'
+                interval:

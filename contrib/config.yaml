@@ -1,0 +1,12 @@
+general:
+    port: 1488
+    daemonize: true
+
+parsers:
+   'echo ping':                     # parser source - filename or command
+        type: command               # file or command  
+        metrics:
+            ping:                   # metric name
+                pattern: '(\w+)'    # PCRE pattern to match line from file or command output, result will be taken from **1st group**
+                type: lastvalue     # available types: lastvalue, rps, count, summ
+                interval: 5         # seconds, period of running command or counting rps

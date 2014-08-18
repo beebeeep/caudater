@@ -1,11 +1,11 @@
 TARGET=caudater
 LIBS=-lm -lyaml -lpthread -lpcre
 
-CC=gcc
-LD=gcc
-CFLAGS=-std=gnu99 -Wall -pedantic -g  -DUSE_YAML_CONFIG
+CC ?= gcc
+CFLAGS += -std=gnu99 -Wall -pedantic -DUSE_YAML_CONFIG
+INSTALL ?= install
 
-OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
+OBJECTS = $(patsubst %.c, %.o, $(wildcard src/*.c))
 HEADERS = $(wildcard *.h)
 
 .PHONY: default all clean
@@ -15,13 +15,19 @@ default: $(TARGET)
 all: default
 
 %.o: %.c $(HEADERS)
-	$(LD) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 .PRECIOUS: $(TARGET) $(OBJECTS)
 
 $(TARGET): $(OBJECTS)
 	$(CC) $(CFLAGS) $(OBJECTS) $(LIBS) -o $@
 
+install: $(TARGET)
+	$(INSTALL) -D -m 755 $(TARGET) $(DESTDIR)/usr/bin/$(TARGET)
+	$(INSTALL) -D -m 644 contrib/config.yaml $(DESTDIR)/etc/yandex/$(TARGET)/config.yaml
+	$(INSTALL) -D -m 644 contrib/caudater.init.conf $(DESTDIR)/etc/init/caudater.conf
+	
+
 clean:
-	-rm -f *.o
-	-rm -f $(TARGET)
+	rm -f src/*.o
+	rm -f $(TARGET)

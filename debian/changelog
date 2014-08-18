@@ -1,0 +1,11 @@
+caudater (0.2) precise; urgency=low
+
+  * Configs, inits etc
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Mon, 18 Aug 2014 23:08:40 +0400
+
+caudater (0.1) testing; urgency=low
+
+  * Initial release.
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Mon, 18 Aug 2014 16:41:39 +0400

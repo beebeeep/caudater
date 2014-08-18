@@ -1,0 +1,16 @@
+Source: caudater
+Section: misc
+Priority: extra
+Maintainer:  Migalin Daniil <dmiga@yandex-team.ru>
+Build-Depends: debhelper (>= 7.0.50~)
+Standards-Version: 3.9.1
+Vcs-Svn: https://github.com/beebeeep/caudater
+
+Package: caudater
+Architecture: any
+Depends:  ${shlibs:Depends}, ${misc:Depends}
+Description: Lightweight daemon for realtime log parsing
+ caudater is tailer-like daemon that reads files (namely, the logfiles)
+ and processing them someways, counting defined metrics (e.g. sum, count, RPS)
+ in real time. It can be useful as a part of some monitoring system. 
+ caudater is intended to be lightweight and fast.

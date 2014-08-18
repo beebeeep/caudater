@@ -175,7 +175,10 @@ struct daemon_config parse_config(char *config_filename)
     }
     for (i = 0; i < elem_count; i++) { 
         kv_elem *c = tree[i];
+        
+#ifdef DEBUG
         printf("Elem %p:\tkey=%s, value=%s, parent = %s\n", (void *)c, c->key, (c->value != NULL)?c->value:"NULL", (c->parent != NULL)?c->parent->key:"NULL");
+#endif
         
         if(c->parent == NULL) continue;
 
@@ -185,7 +188,10 @@ struct daemon_config parse_config(char *config_filename)
             current_parser = &cfg.parsers[cfg.parsers_count-1]; 
             current_parser->source = alloc_copy(c->key);
             current_parser->metrics_count = 0;
+            current_parser->metrics = NULL;
+#ifdef DEBUG
             printf("Found parser '%s'\n", current_parser->source);
+#endif
 
             char *parser_type = get_elem_by_key_parent(tree, elem_count, "type", current_parser->source);
             if (!strcmp(parser_type, "file")) {
@@ -203,6 +209,11 @@ struct daemon_config parse_config(char *config_filename)
            current_parser->metrics = (struct metric *)realloc(
                    current_parser->metrics, 
                    sizeof(struct metric)*current_parser->metrics_count);
+           if(current_parser->metrics == NULL) {
+               printf("Cannot realloc memory!\n");
+               exit(-1);
+           }
+
            current_metric = &current_parser->metrics[current_parser->metrics_count-1];
            current_metric->name = alloc_copy(c->key);
 

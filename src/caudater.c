@@ -24,7 +24,9 @@ void *sig_handler(void *arg)
     int sig;
 
     sigwait(set, &sig);
+#ifdef DEBUG
     printf("Signal handling thread got signal %d\n", sig);
+#endif
     close(config.server_listenfd);
     exit(0);
 }
@@ -41,7 +43,9 @@ void process_metric(struct metric *metric, char *line)
             case TYPE_COUNT: 
                 {
                     *((unsigned long *)metric->result) += 1;
+#ifdef DEBUG
                     printf("Count: '%lu'\n", *((unsigned long *)metric->result));
+#endif
                 } break;
             case TYPE_LASTVALUE: 
                 {
@@ -51,7 +55,9 @@ void process_metric(struct metric *metric, char *line)
                     }
                     memcpy(metric->result, line + ovector[2], len);
                     ((char *)metric->result)[len] = '\0';
+#ifdef DEBUG
                     printf("Last value: '%s'\n", (char *)metric->result);
+#endif
                 } break;
             case TYPE_SUM: 
                 {
@@ -69,7 +75,9 @@ void process_metric(struct metric *metric, char *line)
                     } else {
                         printf("error\n");
                     }
+#ifdef DEBUG
                     printf("Summ: '%f'\n", *((double *)metric->result));
+#endif
                 } break;
             case TYPE_RPS: 
                 {
@@ -114,7 +122,9 @@ void *cmd_parser (void *arg)
 {
     struct parser *parser = (struct parser *) arg; 
 
+#ifdef DEBUG
     printf("Starting cmd_parser for for %s with %i metrics\n", parser->source, parser->metrics_count);
+#endif
 
     FILE *cmd_fd;
     size_t bytes;
@@ -128,7 +138,9 @@ void *cmd_parser (void *arg)
     }
 
     for(;;) {
+#ifdef DEBUG
         printf("Running command '%s'\n", parser->source);
+#endif
         cmd_fd = popen(parser->source, "r");
         if(cmd_fd == NULL) {
             perror("popen() failed");
@@ -136,7 +148,9 @@ void *cmd_parser (void *arg)
         }
 
         while(getline(&line, &bytes, cmd_fd) != -1) {
+#ifdef DEBUG
             printf("Got line '%s'\n", line);
+#endif
             for (i = 0; i < parser->metrics_count; i++) {
                 process_metric(&parser->metrics[i], line);
             }
@@ -152,7 +166,9 @@ void *file_parser (void *arg)
 {
     struct parser *parser = (struct parser *) arg; 
 
+#ifdef DEBUG
     printf("Starting file_parser for for %s with %i metrics\n", parser->source, parser->metrics_count);
+#endif
 
     FILE *file = try_open(parser->source);
     char *line;
@@ -218,7 +234,9 @@ void *file_parser (void *arg)
             }
         } else if (ready == 0){
             /* no data within selected interval, firing DRY processing for counting RPS*/
+#ifdef DEBUG
             printf("Timeout, dry run\n");
+#endif
             for (i = 0; i < parser->metrics_count; i++) {
                 process_metric(&parser->metrics[i], NULL);
             }
