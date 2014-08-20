@@ -1,3 +1,10 @@
+caudater (0.3) precise; urgency=low
+
+  * Fixed config parsing
+  * Fixed logical errors in metrics processing
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Thu, 21 Aug 2014 00:45:38 +0400
+
 caudater (0.2) precise; urgency=low
 
   * Configs, inits etc

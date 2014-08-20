@@ -213,7 +213,6 @@ struct daemon_config parse_config(char *config_filename)
                printf("Cannot realloc memory!\n");
                exit(-1);
            }
-
            current_metric = &current_parser->metrics[current_parser->metrics_count-1];
            current_metric->name = alloc_copy(c->key);
 

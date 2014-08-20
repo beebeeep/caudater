@@ -38,13 +38,13 @@ void process_metric(struct metric *metric, char *line)
     if (line != NULL) {
         rc = pcre_exec(metric->re, metric->re_extra, line, strlen(line), 0, 0, ovector, 30);
     }
-    if (rc > 0 || (line == NULL && metric->type == TYPE_RPS) ) {
+    if (rc > 0 || metric->type == TYPE_RPS) {
         switch(metric->type) {
             case TYPE_COUNT: 
                 {
                     *((unsigned long *)metric->result) += 1;
 #ifdef DEBUG
-                    printf("Count: '%lu'\n", *((unsigned long *)metric->result));
+                    printf("%s count: '%lu'\n", metric->name, *((unsigned long *)metric->result));
 #endif
                 } break;
             case TYPE_LASTVALUE: 
@@ -56,7 +56,7 @@ void process_metric(struct metric *metric, char *line)
                     memcpy(metric->result, line + ovector[2], len);
                     ((char *)metric->result)[len] = '\0';
 #ifdef DEBUG
-                    printf("Last value: '%s'\n", (char *)metric->result);
+                    printf("%s last value: '%s'\n", metric->name, (char *)metric->result);
 #endif
                 } break;
             case TYPE_SUM: 
@@ -76,19 +76,23 @@ void process_metric(struct metric *metric, char *line)
                         printf("error\n");
                     }
 #ifdef DEBUG
-                    printf("Summ: '%f'\n", *((double *)metric->result));
+                    printf("%s summ: '%f'\n", metric->name, *((double *)metric->result));
 #endif
                 } break;
             case TYPE_RPS: 
                 {
+                    if (rc > 0) {
+                        *((double *)metric->acc) += 1.0;
+                    }
+
                     time_t tdiff = time(NULL) - metric->last_updated;
                     if (tdiff >= metric->interval) {
                         *((double *)metric->result) = (*((double *)metric->acc))/tdiff;
                         *((double *)metric->acc) = 0.0;
                         metric->last_updated = time(NULL);
-                        printf("RPS: %f\n", *((double *)metric->result));
-                    } else {
-                        *((double *)metric->acc) += 1.0;
+#ifdef DEBUG
+                        printf("%s RPS: %f\n", metric->name, *((double *)metric->result));
+#endif
                     }
                 } break;
         }
