@@ -1,5 +1,5 @@
 TARGET=caudater
-LIBS=-lm -lyaml -lpthread -lpcre
+LIBS=-lyaml -lpthread -lpcre
 
 CC ?= gcc
 CFLAGS += -std=gnu99 -Wall -pedantic -DUSE_YAML_CONFIG
@@ -24,7 +24,7 @@ $(TARGET): $(OBJECTS)
 
 install: $(TARGET)
 	$(INSTALL) -D -m 755 $(TARGET) $(DESTDIR)/usr/bin/$(TARGET)
-	$(INSTALL) -D -m 644 contrib/config.yaml $(DESTDIR)/etc/yandex/$(TARGET)/config.yaml
+	$(INSTALL) -D -m 644 contrib/config-default.yaml $(DESTDIR)/etc/yandex/$(TARGET)/config-default.yaml
 	$(INSTALL) -D -m 644 contrib/caudater.init.conf $(DESTDIR)/etc/init/caudater.conf
 	
 

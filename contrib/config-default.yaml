@@ -1,0 +1,20 @@
+general:
+  port: 1488
+  daemonize: true                   # not working lol - using upstart instead
+
+parsers:
+  'echo pong':                      # parser source - filename or command
+    type: command                   # file or command  
+    metrics:
+      ping:                         # metric name
+        pattern: '(\w+)'            # PCRE pattern to match line from file or command output, result will be taken from **1st group**
+        type: lastvalue             # available types: lastvalue, rps, count, summ
+        interval: 5                 # seconfss, period of running command or counting rps
+            
+  'cat /proc/loadavg':
+    type: command
+    metrics:
+      la:
+        type: lastvalue
+        pattern: '^([0-9.]+) '
+        interval: 2
