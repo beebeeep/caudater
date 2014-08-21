@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <linux/limits.h>
 #include <signal.h>
+#include <sys/socket.h>
 
 #include "caudater.h"
 #include "server.h"
@@ -27,7 +28,8 @@ void *sig_handler(void *arg)
 #ifdef DEBUG
     printf("Signal handling thread got signal %d\n", sig);
 #endif
-    close(config.server_listenfd);
+    //close(config.server_listenfd);
+    shutdown(config.server_listenfd, SHUT_RDWR);
     exit(0);
 }
 

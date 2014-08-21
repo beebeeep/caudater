@@ -1,3 +1,10 @@
+caudater (0.4) precise; urgency=low
+
+  * Correct socket shutdown on exit
+  * Moved config.yaml to config-default.yaml
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Thu, 21 Aug 2014 19:41:45 +0400
+
 caudater (0.3) precise; urgency=low
 
   * Fixed config parsing
