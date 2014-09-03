@@ -83,15 +83,13 @@ struct daemon_config parse_config(char *config_filename)
         exit(-1);
     }
     yaml_parser_t parser;
-    yaml_event_t  event;   /* New variable */
+    yaml_event_t  event;
 
-    /* Initialize parser */
     if(!yaml_parser_initialize(&parser))
         fputs("Failed to initialize parser!\n", stderr);
     if(fh == NULL)
         fputs("Failed to open file!\n", stderr);
 
-    /* Set input file */
     yaml_parser_set_input_file(&parser, fh);
 
     kv_elem *top_elem = (kv_elem *)malloc(sizeof(elem));
@@ -105,25 +103,26 @@ struct daemon_config parse_config(char *config_filename)
     unsigned elem_count = 1;
 
     unsigned kv_parity = 0;
+    int done = 0;
 
-    /* START new code */
-    do {
+    while(!done) {
         if (!yaml_parser_parse(&parser, &event)) {
             printf("Parser error %d\n", parser.error);
             exit(EXIT_FAILURE);
         }
 
+        printf("Got event %d\n", event.type);
+
         switch(event.type)
         { 
-            case YAML_NO_EVENT:
-            case YAML_STREAM_START_EVENT:
-            case YAML_STREAM_END_EVENT:
-            case YAML_DOCUMENT_START_EVENT:
-            case YAML_DOCUMENT_END_EVENT:
-            case YAML_SEQUENCE_START_EVENT: 
-            case YAML_SEQUENCE_END_EVENT:   
-            case YAML_ALIAS_EVENT:  
-                break;
+            case YAML_NO_EVENT: break;
+            case YAML_STREAM_START_EVENT: break;
+            case YAML_STREAM_END_EVENT: break;
+            case YAML_DOCUMENT_START_EVENT: break;
+            case YAML_DOCUMENT_END_EVENT: break;
+            case YAML_SEQUENCE_START_EVENT: break;
+            case YAML_SEQUENCE_END_EVENT:   break;
+            case YAML_ALIAS_EVENT:  break;
             case YAML_MAPPING_START_EVENT:  
                                             kv_parity = 0;
                                             parent_stack = push(curr_elem, parent_stack);
@@ -133,29 +132,26 @@ struct daemon_config parse_config(char *config_filename)
                                             curr_elem = pop(&parent_stack);
                                             break;
             case YAML_SCALAR_EVENT: 
+                                            printf("Got scalar '%s' of length %lu\n", event.data.scalar.value, event.data.scalar.length);
                                             if(kv_parity++ % 2 == 0) {      /* this is a key */
                                                 kv_elem *new_elem = (kv_elem *)malloc(sizeof(kv_elem));
-                                                new_elem->key = malloc(event.data.scalar.length);
+                                                new_elem->key = malloc(event.data.scalar.length+1);
                                                 new_elem->value = NULL;
-                                                memcpy(new_elem->key, event.data.scalar.value, event.data.scalar.length+1);
+                                                strncpy(new_elem->key, (char *)event.data.scalar.value, event.data.scalar.length+1);
                                                 new_elem->parent = parent_stack->value;
                                                 tree[elem_count++] = new_elem; 
                                                 curr_elem = new_elem; 
                                             } else {    /* this is a value */
-                                                curr_elem->value = malloc(event.data.scalar.length);
-                                                memcpy(curr_elem->value, event.data.scalar.value, event.data.scalar.length+1);
+                                                curr_elem->value = malloc(event.data.scalar.length+1);
+                                                strncpy(curr_elem->value, (char *)event.data.scalar.value, event.data.scalar.length+1);
                                             }
-
-
                                             break;
         }
-        if(event.type != YAML_STREAM_END_EVENT)
-            yaml_event_delete(&event);
-    } while(event.type != YAML_STREAM_END_EVENT);
-    yaml_event_delete(&event);
-    /* END new code */
 
-    /* Cleanup */
+        done = (event.type == YAML_STREAM_END_EVENT);
+        yaml_event_delete(&event);
+    }
+
     yaml_parser_delete(&parser);
     fclose(fh);
 
@@ -215,6 +211,7 @@ struct daemon_config parse_config(char *config_filename)
            }
            current_metric = &current_parser->metrics[current_parser->metrics_count-1];
            current_metric->name = alloc_copy(c->key);
+           current_metric->interval = 60;
 
            char *pattern = get_elem_by_key_parent(tree, elem_count, "pattern", current_metric->name);
            if(pattern == NULL) {
@@ -237,15 +234,27 @@ struct daemon_config parse_config(char *config_filename)
                current_metric->type = TYPE_LASTVALUE;
                current_metric->acc = NULL;
                current_metric->result = malloc(BUFF_SIZE);
-           } else if (!strcmp(type, "rps")) {
+               memset(current_metric->result, 0, BUFF_SIZE);
+           } else if (!strcmp(type, "rps") || !strcmp(type, "avgcount")) {
                if(current_parser->type == PT_CMD) {
                    printf("Cannot use rps metric '%s'for command parser '%s'\n", current_metric->name, current_parser->source);
                    exit(-1);
                }
                current_metric->type = TYPE_RPS;
-               current_metric->acc = malloc(sizeof(double));
-               current_metric->result = malloc(sizeof(double));
-               *((double *)current_metric->result) = 0.0;
+
+               current_metric->acc = malloc(sizeof(moving_avg));
+               moving_avg *t = (moving_avg *)current_metric->acc;
+               t->values = (unsigned long *)malloc(sizeof(unsigned long) * current_metric->interval);
+               memset(t->values, 0, sizeof(unsigned long) * current_metric->interval);
+               t->current = 0;
+
+               if (!strcmp(type, "rps")) {
+                   current_metric->result = malloc(sizeof(double));
+                   *((double *)current_metric->result) = 0.0;
+               } else if (!strcmp(type, "avgcount")) {
+                   current_metric->result = malloc(sizeof(unsigned long));
+                   *((unsigned long *)current_metric->result) = 0;
+               }
            } else if (!strcmp(type, "sum")) {
                current_metric->type = TYPE_SUM;
                current_metric->acc = malloc(sizeof(double));

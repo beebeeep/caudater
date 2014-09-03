@@ -1,3 +1,17 @@
+caudater (0.6) precise; urgency=low
+
+  * Added correct averaging of rps and avgcount 
+  * Fixed server output
+  * Cumulative metrics zeroing on file rotate
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Thu, 04 Sep 2014 00:25:25 +0400
+
+caudater (0.5) precise; urgency=low
+
+  * Added avgcount metric type stub - processed as rps
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Fri, 22 Aug 2014 17:01:25 +0400
+
 caudater (0.4) precise; urgency=low
 
   * Correct socket shutdown on exit

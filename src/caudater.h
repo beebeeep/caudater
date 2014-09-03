@@ -7,6 +7,7 @@
 #define TYPE_COUNT          1
 #define TYPE_RPS            2
 #define TYPE_SUM            3
+#define TYPE_AVGCOUNT       4
 
 #define T_STRING    0
 #define T_INT       1
@@ -33,6 +34,7 @@ struct parser {
     char *source; 
     int type;
     pthread_t thread_id;
+    pthread_attr_t thread_attr;
     struct metric *metrics;
     unsigned metrics_count;
 };
@@ -44,5 +46,10 @@ struct daemon_config {
     int server_listenfd;
     struct parser *parsers;
 };
+
+typedef struct moving_avg_t {
+  unsigned long *values;
+  size_t current;
+} moving_avg;
 
 struct daemon_config parse_config(char *config_filename);

@@ -33,6 +33,19 @@ void *sig_handler(void *arg)
     exit(0);
 }
 
+void zero_metric(struct metric *metric)
+{
+
+    /* а что еще надо обнулять? rps пусть будут непрерывные, 
+     * avgcount тоже 
+     */
+    if(metric->type == TYPE_SUM) { 
+        *((double *)metric->result) = 0.0;
+    } else if(metric->type == TYPE_COUNT) { 
+        *((unsigned long *)metric->result) = 0;
+    }
+}
+
 void process_metric(struct metric *metric, char *line)
 {
     int ovector[30];
@@ -81,20 +94,45 @@ void process_metric(struct metric *metric, char *line)
                     printf("%s summ: '%f'\n", metric->name, *((double *)metric->result));
 #endif
                 } break;
+            case TYPE_AVGCOUNT:
             case TYPE_RPS: 
                 {
+                    /* if there is regex match */
                     if (rc > 0) {
-                        *((double *)metric->acc) += 1.0;
+                        //*((double *)metric->acc) += 1.0;
+                        moving_avg *t = (moving_avg *)metric->acc;
+                        t->values[t->current] += 1;
                     }
 
                     time_t tdiff = time(NULL) - metric->last_updated;
-                    if (tdiff >= metric->interval) {
-                        *((double *)metric->result) = (*((double *)metric->acc))/tdiff;
-                        *((double *)metric->acc) = 0.0;
-                        metric->last_updated = time(NULL);
+                    if (tdiff >= 1) {
+                        /* *((double *)metric->result) = (*((double *)metric->acc))/tdiff;
+                        *((double *)metric->acc) = 0.0; 
+                        */ 
+
+                        moving_avg *t = (moving_avg *)metric->acc;
+                        t->current = (t->current + 1) % metric->interval;
+                        t->values[t->current] = 0;
+
+                        unsigned long sum = 0;
+                        size_t i;
+                        for (i = 0; i < metric->interval; i++) {
+                            sum += t->values[i];
+                        }
+
+                        if (metric->type == TYPE_RPS) {
+                            *((double *)metric->result) = (double) sum / metric->interval;
 #ifdef DEBUG
-                        printf("%s RPS: %f\n", metric->name, *((double *)metric->result));
+                            printf("%s RPS: %f\n", metric->name, *((double *)metric->result));
 #endif
+                        } else if (metric->type == TYPE_AVGCOUNT) {
+                            *((unsigned long *)metric->result) = sum;
+#ifdef DEBUG
+                            printf("%s AVGCOUNT: %lu\n", metric->name, *((unsigned long *)metric->result));
+#endif
+                        }
+
+                        metric->last_updated = time(NULL);
                     }
                 } break;
         }
@@ -107,9 +145,10 @@ FILE *try_open(char *filename)
     /* wait until we found readable file specified in config */
     for (;;) {
         if (access(filename, R_OK) != 0) {
+            /* TODO придумать чего тут лучше сделать - может, помирать? */
             snprintf(msg, PATH_MAX+30, "Error reading '%s'", filename);
             perror(msg);
-            struct timespec t = {.tv_sec = 1, .tv_nsec = 0}, r;
+            struct timespec t = {.tv_sec = 300, .tv_nsec = 0}, r;
             nanosleep(&t, &r);
         } else {
             FILE *f = fopen(filename, "r");
@@ -129,7 +168,7 @@ void *cmd_parser (void *arg)
     struct parser *parser = (struct parser *) arg; 
 
 #ifdef DEBUG
-    printf("Starting cmd_parser for for %s with %i metrics\n", parser->source, parser->metrics_count);
+    printf("Starting cmd_parser for for %s with %i metrics", parser->source, parser->metrics_count);
 #endif
 
     FILE *cmd_fd;
@@ -142,8 +181,14 @@ void *cmd_parser (void *arg)
             min_interval = parser->metrics[i].interval;
         }
     }
+#ifdef DEBUG
+    printf(" and interval %i\n", min_interval);
+#endif
 
     for(;;) {
+        for (i = 0; i < parser->metrics_count; i++) {
+            zero_metric(&parser->metrics[i]);
+        }
 #ifdef DEBUG
         printf("Running command '%s'\n", parser->source);
 #endif
@@ -162,6 +207,7 @@ void *cmd_parser (void *arg)
             }
         }
         pclose(cmd_fd);
+
         struct timespec t = {.tv_sec = min_interval, .tv_nsec = 0}, r;
         nanosleep(&t, &r);
     }
@@ -190,25 +236,37 @@ void *file_parser (void *arg)
         exit(-1);
     }
 
+    /*
     unsigned min_interval = parser->metrics[0].interval;
     for (i = 0; i < parser->metrics_count; i++) {
         if (parser->metrics[i].interval < min_interval) {
             min_interval = parser->metrics[i].interval;
         }
     }
+    */
+
     /* we will use select on inotify fd to recount rps after specified interval */
     fd_set rfds;
     struct timeval tv, *timeout;
     int ready;
 
     while(1) {
+        /*
         if (min_interval != 0) {
             timeout = &tv;
             timeout->tv_sec = min_interval;
             timeout->tv_usec = 0;
         } else {
             timeout = NULL;
-        }
+        }*/
+
+        /* we update rps and avgcount every second, counting average in
+         * specified window
+         */
+        timeout = &tv;
+        timeout->tv_sec = 1;
+        timeout->tv_usec = 0;
+
         FD_ZERO(&rfds);
         FD_SET(ifd, &rfds);
         ready = select(ifd+1, &rfds, NULL, NULL, timeout);
@@ -236,6 +294,9 @@ void *file_parser (void *arg)
                 if (iwd < 0) {
                     perror("Cannot add watch");
                     exit(-1);
+                }
+                for (i = 0; i < parser->metrics_count; i++) {
+                    zero_metric(&parser->metrics[i]);
                 }
             }
         } else if (ready == 0){
@@ -288,7 +349,9 @@ int main(int argc, char *argv[])
             printf ("Unknown parser type!\n");
             exit(-1);
         }
-        if (pthread_create(&config.parsers[i].thread_id, NULL, parser_worker, (void *) &config.parsers[i]) != 0) {
+      pthread_attr_init(&config.parsers[i].thread_attr);
+      pthread_attr_setdetachstate(&config.parsers[i].thread_attr, PTHREAD_CREATE_DETACHED);
+        if (pthread_create(&config.parsers[i].thread_id, &config.parsers[i].thread_attr, parser_worker, (void *) &config.parsers[i]) != 0) {
             perror("Cannot start thread");
             exit(-1);
         }
