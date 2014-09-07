@@ -1,5 +1,5 @@
 TARGET=caudater
-LIBS=-lyaml -lpthread -lpcre
+LIBS=-lyaml -lpthread -lpcre -lcurl
 
 CC ?= gcc
 CFLAGS += -std=gnu99 -Wall -pedantic -DUSE_YAML_CONFIG

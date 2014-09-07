@@ -111,8 +111,6 @@ struct daemon_config parse_config(char *config_filename)
             exit(EXIT_FAILURE);
         }
 
-        printf("Got event %d\n", event.type);
-
         switch(event.type)
         { 
             case YAML_NO_EVENT: break;
@@ -132,7 +130,6 @@ struct daemon_config parse_config(char *config_filename)
                                             curr_elem = pop(&parent_stack);
                                             break;
             case YAML_SCALAR_EVENT: 
-                                            printf("Got scalar '%s' of length %lu\n", event.data.scalar.value, event.data.scalar.length);
                                             if(kv_parity++ % 2 == 0) {      /* this is a key */
                                                 kv_elem *new_elem = (kv_elem *)malloc(sizeof(kv_elem));
                                                 new_elem->key = malloc(event.data.scalar.length+1);
@@ -194,6 +191,14 @@ struct daemon_config parse_config(char *config_filename)
                 current_parser->type = PT_FILE;
             } else if (!strcmp(parser_type, "command")) {
                 current_parser->type = PT_CMD;
+            } else if (!strcmp(parser_type, "http")) {
+                current_parser->type = PT_HTTP;
+                char *timeout = get_elem_by_key_parent(tree, elem_count, "timeout", current_parser->source);
+                if (timeout == NULL) {
+                    current_parser->timeout = 3;
+                } else {
+                    current_parser->timeout = atol(timeout);
+                }
             } else {
                 printf("Unknown parser type '%s'!\n", parser_type);
                 exit(-1);
@@ -214,11 +219,16 @@ struct daemon_config parse_config(char *config_filename)
            current_metric->interval = 60;
 
            char *pattern = get_elem_by_key_parent(tree, elem_count, "pattern", current_metric->name);
-           if(pattern == NULL) {
-               printf("Error parsing metric '%s' config: metric should have pattern!", current_metric->name);
-               exit(-1);
-           }
+           /* Думаете, вам не нужна вторая отрицающая регулярка? 
+            * Думали воспользоваться negative lookahead/lookbehind? 
+            * Подумайте еще раз. 
+            * Не шутите с этими ребятами.
+            * Они сожрут ваш ужин и трахнут вашу собачку.
+            * Просто напишите еще одну регулярку. 
+            */
+           char *ignore_pattern = get_elem_by_key_parent(tree, elem_count, "ignore_pattern", current_metric->name);
            current_metric->pattern = alloc_copy(pattern);
+           current_metric->ignore_pattern = alloc_copy(ignore_pattern);
 
            char *interval = get_elem_by_key_parent(tree, elem_count, "interval", current_metric->name); 
            if(interval != NULL) {
@@ -274,6 +284,22 @@ struct daemon_config parse_config(char *config_filename)
                printf("PCRE compilation failed at offset %d: %s\n", pcre_erroffset, pcre_error);
                exit(1);
            }
+           if (current_metric->ignore_pattern != NULL) {
+               current_metric->ignore_re = pcre_compile(current_metric->ignore_pattern, PCRE_UTF8, &pcre_error, &pcre_erroffset, NULL);    
+               if (current_metric->re == NULL) {
+                   printf("PCRE compilation failed at offset %d: %s\n", pcre_erroffset, pcre_error);
+                   exit(1);
+               }
+               current_metric->ignore_re_extra = pcre_study(current_metric->ignore_re, 0, &pcre_error);
+               if (pcre_error != NULL) {
+                   printf("Errors studying ignore pattern: %s\n", pcre_error);
+                   exit(1);
+               }
+           } else {
+               current_metric->ignore_re = NULL;    
+               current_metric->ignore_re_extra = NULL;    
+           }
+
            current_metric->re_extra = pcre_study(current_metric->re, 0, &pcre_error);
            if (pcre_error != NULL) {
                printf("Errors studying pattern: %s\n", pcre_error);

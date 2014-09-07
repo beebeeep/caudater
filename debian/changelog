@@ -1,3 +1,33 @@
+caudater (0.11) precise; urgency=low
+
+  * Added HTTP parser support
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Sun, 07 Sep 2014 15:19:28 +0400
+
+caudater (0.10) precise; urgency=low
+
+  * Added SIGPIPE ignoring
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Sat, 06 Sep 2014 00:34:07 +0400
+
+caudater (0.9) precise; urgency=low
+
+  * Changed floats output format
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Fri, 05 Sep 2014 18:00:54 +0400
+
+caudater (0.8) precise; urgency=low
+
+  * Removed trash from stdout
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Thu, 04 Sep 2014 18:51:23 +0400
+
+caudater (0.7) precise; urgency=low
+
+  * Added ignore_pattern
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Thu, 04 Sep 2014 18:26:13 +0400
+
 caudater (0.6) precise; urgency=low
 
   * Added correct averaging of rps and avgcount 

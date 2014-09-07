@@ -13,21 +13,33 @@
 #include <linux/limits.h>
 #include <signal.h>
 #include <sys/socket.h>
+#include <curl/curl.h>
 
 #include "caudater.h"
 #include "server.h"
 
 struct daemon_config config;
+sigset_t set;
 
 void *sig_handler(void *arg)
 {
     sigset_t *set = arg;
     int sig;
 
-    sigwait(set, &sig);
+    for(;;) { 
+        sigwait(set, &sig);
+        if(sig == SIGPIPE) {
 #ifdef DEBUG
-    printf("Signal handling thread got signal %d\n", sig);
+            printf("Signal handling thread got SIGPIPE, ignoring\n");
 #endif
+        } else {
+#ifdef DEBUG
+            printf("Signal handling thread got signal %d\n", sig);
+#endif
+            break;
+        }
+    }
+
     //close(config.server_listenfd);
     shutdown(config.server_listenfd, SHUT_RDWR);
     exit(0);
@@ -49,11 +61,14 @@ void zero_metric(struct metric *metric)
 void process_metric(struct metric *metric, char *line)
 {
     int ovector[30];
-    int rc = 0;
+    int rc = 0, ignore_rc = -1;
     if (line != NULL) {
         rc = pcre_exec(metric->re, metric->re_extra, line, strlen(line), 0, 0, ovector, 30);
+        if(metric->ignore_re != NULL) {
+            ignore_rc = pcre_exec(metric->ignore_re, metric->ignore_re_extra, line, strlen(line), 0, 0, ovector, 30);
+        }
     }
-    if (rc > 0 || metric->type == TYPE_RPS) {
+    if ((rc > 0 && ignore_rc <= 0)  || metric->type == TYPE_RPS) {
         switch(metric->type) {
             case TYPE_COUNT: 
                 {
@@ -98,7 +113,7 @@ void process_metric(struct metric *metric, char *line)
             case TYPE_RPS: 
                 {
                     /* if there is regex match */
-                    if (rc > 0) {
+                    if (rc > 0 && ignore_rc <= 0) {
                         //*((double *)metric->acc) += 1.0;
                         moving_avg *t = (moving_avg *)metric->acc;
                         t->values[t->current] += 1;
@@ -139,6 +154,14 @@ void process_metric(struct metric *metric, char *line)
     } 
 }
 
+void process_all_metrics(struct parser *parser, char *line)
+{
+    size_t i;
+    for (i = 0; i < parser->metrics_count; i++) {
+        process_metric(&(parser->metrics[i]), line);
+    }
+}
+
 FILE *try_open(char *filename)
 {
     char msg[PATH_MAX+30];
@@ -163,12 +186,102 @@ FILE *try_open(char *filename)
     }
 }
 
+static size_t process_http_data(void *data, size_t size, size_t nmemb, void *userp)
+{
+    size_t realsize = size * nmemb;
+    char *str = (char *)data;
+    char *line = data; 
+    struct http_cb_data *r = (struct http_cb_data*)userp;
+    size_t i = 0;
+    for(i = 0; i < realsize - 1; i++){
+        if ( str[i] == '\n' || str[i] ==  '\r') {
+            str[i] = '\0';
+            if(strlen(r->str) > 0) {
+                /* we have unprocessed string part from previous callback, 
+                 * prepend received data with it
+                 */
+                r->str = realloc(r->str, strlen(r->str) + strlen(line) + 1);
+                strcat(r->str, line);
+                process_all_metrics(r->parser, r->str);
+
+                r->str[0] = '\0';
+            } else {
+                process_all_metrics(r->parser, line);
+            }
+            line = &str[i + 1];
+        }
+    }
+
+    /* save all remaining data will for processing in next callback or later */
+    size_t remain_len = realsize - (line - str);
+    r->str = realloc(r->str, remain_len + 1);
+    strncpy(r->str, line, remain_len);
+    r->str[remain_len] = '\0';
+    return realsize;
+}
+
+void *http_parser (void *arg)
+{
+    struct parser *parser = (struct parser *) arg; 
+
+#ifdef DEBUG
+    printf("Starting http_parser for for %s with %lu metrics", parser->source, parser->metrics_count);
+#endif
+    unsigned min_interval = parser->metrics[0].interval, i;
+    for (i = 0; i < parser->metrics_count; i++) {
+        if (parser->metrics[i].interval < min_interval) {
+            min_interval = parser->metrics[i].interval;
+        }
+    }
+#ifdef DEBUG
+    printf(" and interval %i\n", min_interval);
+#endif
+
+    CURL *curl_handle;
+    CURLcode res;
+    curl_global_init(CURL_GLOBAL_ALL);
+
+    struct http_cb_data r;
+    r.str = malloc(1);
+    r.parser = parser;
+
+    for(;;) {
+        for (i = 0; i < parser->metrics_count; i++) {
+            zero_metric(&parser->metrics[i]);
+        }
+#ifdef DEBUG
+        printf("Fetching URL '%s'\n", parser->source);
+#endif
+
+        curl_handle = curl_easy_init();
+        curl_easy_setopt(curl_handle, CURLOPT_URL, parser->source);
+        curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, process_http_data);
+        curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *)&r);
+        curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "libcurl-agent/1.0");
+        curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, parser->timeout);
+        res = curl_easy_perform(curl_handle);
+        if(res != CURLE_OK) {
+            fprintf(stderr, "Cannot fetch %s: %s\n",
+                    parser->source, curl_easy_strerror(res));
+        } else {
+            process_all_metrics(parser, r.str);
+        }
+
+        curl_easy_cleanup(curl_handle);
+
+        struct timespec t = {.tv_sec = min_interval, .tv_nsec = 0}, r;
+        nanosleep(&t, &r);
+    }
+    free(r.str);
+    curl_global_cleanup();
+}
+
 void *cmd_parser (void *arg)
 {
     struct parser *parser = (struct parser *) arg; 
 
 #ifdef DEBUG
-    printf("Starting cmd_parser for for %s with %i metrics", parser->source, parser->metrics_count);
+    printf("Starting cmd_parser for for %s with %lu metrics", parser->source, parser->metrics_count);
 #endif
 
     FILE *cmd_fd;
@@ -202,9 +315,7 @@ void *cmd_parser (void *arg)
 #ifdef DEBUG
             printf("Got line '%s'\n", line);
 #endif
-            for (i = 0; i < parser->metrics_count; i++) {
-                process_metric(&parser->metrics[i], line);
-            }
+            process_all_metrics(parser, line);
         }
         pclose(cmd_fd);
 
@@ -219,7 +330,7 @@ void *file_parser (void *arg)
     struct parser *parser = (struct parser *) arg; 
 
 #ifdef DEBUG
-    printf("Starting file_parser for for %s with %i metrics\n", parser->source, parser->metrics_count);
+    printf("Starting file_parser for for %s with %lu metrics\n", parser->source, parser->metrics_count);
 #endif
 
     FILE *file = try_open(parser->source);
@@ -281,9 +392,7 @@ void *file_parser (void *arg)
                  * XXX don't lock for too much time waiting last endline
                  */
                 while(getline(&line, &bytes, file) != -1) {
-                    for (i = 0; i < parser->metrics_count; i++) {
-                        process_metric(&parser->metrics[i], line);
-                    }
+                    process_all_metrics(parser, line);
                 }
             } else if (event.mask & (IN_MOVE_SELF | IN_DELETE_SELF)) {
                 /* file was deleted or moved by logrotate or someone else, try to reopen it and add new watch */
@@ -304,9 +413,7 @@ void *file_parser (void *arg)
 #ifdef DEBUG
             printf("Timeout, dry run\n");
 #endif
-            for (i = 0; i < parser->metrics_count; i++) {
-                process_metric(&parser->metrics[i], NULL);
-            }
+            process_all_metrics(parser, NULL);
         }
     }
     return NULL;
@@ -322,12 +429,12 @@ int main(int argc, char *argv[])
     config = parse_config(argv[1]);
 
     int r;
-    sigset_t set;
     pthread_t sig_thread;
     sigemptyset(&set);
     sigaddset(&set, SIGQUIT);
     sigaddset(&set, SIGINT);
     sigaddset(&set, SIGTERM);
+    sigaddset(&set, SIGPIPE);
     r = pthread_sigmask(SIG_BLOCK, &set, NULL);
     if (r != 0) {
        perror("Cannot set sigmask");
@@ -345,6 +452,8 @@ int main(int argc, char *argv[])
             parser_worker = file_parser;
         } else if (config.parsers[i].type == PT_CMD) {
             parser_worker = cmd_parser;
+        } else if (config.parsers[i].type == PT_HTTP) {
+            parser_worker = http_parser;
         } else {
             printf ("Unknown parser type!\n");
             exit(-1);

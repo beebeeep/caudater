@@ -33,10 +33,10 @@ void *responder(void *p)
         int bytes = snprintf(buff, BUFF_SIZE, "%s=%lu\n", m->name, *((unsigned long *)m->result));
         write(param->fd, buff, bytes);
       } else if (m->type == TYPE_RPS) {
-        int bytes = snprintf(buff, BUFF_SIZE, "%s=%f\n", m->name, *((double *)m->result));
+        int bytes = snprintf(buff, BUFF_SIZE, "%s=%.2f\n", m->name, *((double *)m->result));
         write(param->fd, buff, bytes);
       } else if (m->type == TYPE_SUM) {
-        int bytes = snprintf(buff, BUFF_SIZE, "%s=%f\n", m->name, *((double *)m->result));
+        int bytes = snprintf(buff, BUFF_SIZE, "%s=%.2f\n", m->name, *((double *)m->result));
         write(param->fd, buff, bytes);
       }
     }
