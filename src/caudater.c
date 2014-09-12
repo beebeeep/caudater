@@ -42,6 +42,7 @@ void *sig_handler(void *arg)
 
     //close(config.server_listenfd);
     shutdown(config.server_listenfd, SHUT_RDWR);
+    close(config.server_listenfd);
     exit(0);
 }
 
@@ -259,6 +260,10 @@ void *http_parser (void *arg)
         curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *)&r);
         curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "libcurl-agent/1.0");
         curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, parser->timeout);
+        /* disable signals for multithreaded environment.
+         * see https://clck.ru/9JMDi for more info
+         */
+        curl_easy_setopt(curl_handle, CURLOPT_NOSIGNAL, 1L);
         res = curl_easy_perform(curl_handle);
         if(res != CURLE_OK) {
             fprintf(stderr, "Cannot fetch %s: %s\n",

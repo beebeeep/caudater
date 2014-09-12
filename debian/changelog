@@ -1,3 +1,10 @@
+caudater (0.12) precise; urgency=low
+
+  * Fixed crashes in libcurl
+  * Fixed socket re-binding problem
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Fri, 12 Sep 2014 11:01:00 +0400
+
 caudater (0.11) precise; urgency=low
 
   * Added HTTP parser support

@@ -60,6 +60,12 @@ void start_server(struct daemon_config *config)
     perror("Cannot create socket");
     exit(-1);
   }
+  int x = 1;
+  if(setsockopt(config->server_listenfd, SOL_SOCKET, SO_REUSEADDR, &x, sizeof(x)) != 0) {
+      perror("setsockopt failed");
+      exit(-1);
+  }
+  
 
   if (bind(config->server_listenfd, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
     perror("Cannot bind socket");
