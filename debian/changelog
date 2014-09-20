@@ -1,3 +1,9 @@
+caudater (0.13) precise; urgency=low
+
+  * Close logs after rotating
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Sat, 20 Sep 2014 00:25:38 +0400
+
 caudater (0.12) precise; urgency=low
 
   * Fixed crashes in libcurl

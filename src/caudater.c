@@ -172,7 +172,7 @@ FILE *try_open(char *filename)
             /* TODO придумать чего тут лучше сделать - может, помирать? */
             snprintf(msg, PATH_MAX+30, "Error reading '%s'", filename);
             perror(msg);
-            struct timespec t = {.tv_sec = 300, .tv_nsec = 0}, r;
+            struct timespec t = {.tv_sec = 3, .tv_nsec = 0}, r;
             nanosleep(&t, &r);
         } else {
             FILE *f = fopen(filename, "r");
@@ -403,6 +403,7 @@ void *file_parser (void *arg)
                 /* file was deleted or moved by logrotate or someone else, try to reopen it and add new watch */
                 printf("File '%s' was moved or deleted, trying to reopen\n", parser->source);
                 inotify_rm_watch(ifd, iwd);
+                fclose(file);
                 file = try_open(parser->source);
                 iwd = inotify_add_watch(ifd, parser->source, IN_MODIFY|IN_DELETE_SELF|IN_MOVE_SELF);
                 if (iwd < 0) {
