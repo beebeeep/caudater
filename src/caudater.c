@@ -172,7 +172,7 @@ FILE *try_open(char *filename)
             /* TODO придумать чего тут лучше сделать - может, помирать? */
             snprintf(msg, PATH_MAX+30, "Error reading '%s'", filename);
             perror(msg);
-            struct timespec t = {.tv_sec = 3, .tv_nsec = 0}, r;
+            struct timespec t = {.tv_sec = 300, .tv_nsec = 0}, r;
             nanosleep(&t, &r);
         } else {
             FILE *f = fopen(filename, "r");
