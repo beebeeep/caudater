@@ -1,3 +1,9 @@
+caudater (0.15) precise; urgency=low
+
+  * Start at runlevel 2
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Tue, 07 Apr 2015 15:58:56 +0400
+
 caudater (0.14) precise; urgency=low
 
   * Longer timeout between missing file check
