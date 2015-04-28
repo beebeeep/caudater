@@ -239,18 +239,19 @@ struct daemon_config parse_config(char *config_filename)
                printf("Error parsing metric '%s' config: metric should have type!", current_metric->name);
                exit(-1);
            }
+           char *output_format = get_elem_by_key_parent(tree, elem_count, "output_format", current_metric->name);
 
            if(!strcmp(type, "lastvalue")) {
                current_metric->type = TYPE_LASTVALUE;
                current_metric->acc = NULL;
                current_metric->result = malloc(BUFF_SIZE);
                memset(current_metric->result, 0, BUFF_SIZE);
+               current_metric->output_format = "%s=%s\n";
            } else if (!strcmp(type, "rps") || !strcmp(type, "avgcount")) {
                if(current_parser->type == PT_CMD) {
                    printf("Cannot use rps metric '%s'for command parser '%s'\n", current_metric->name, current_parser->source);
                    exit(-1);
                }
-               current_metric->type = TYPE_RPS;
 
                current_metric->acc = malloc(sizeof(moving_avg));
                moving_avg *t = (moving_avg *)current_metric->acc;
@@ -259,22 +260,36 @@ struct daemon_config parse_config(char *config_filename)
                t->current = 0;
 
                if (!strcmp(type, "rps")) {
+                   current_metric->type = TYPE_RPS;
                    current_metric->result = malloc(sizeof(double));
                    *((double *)current_metric->result) = 0.0;
+                   current_metric->output_format = "%s=%.2f\n";
                } else if (!strcmp(type, "avgcount")) {
+                   current_metric->type = TYPE_AVGCOUNT;
                    current_metric->result = malloc(sizeof(unsigned long));
                    *((unsigned long *)current_metric->result) = 0;
+                   current_metric->output_format = "%s=%lu\n";
                }
            } else if (!strcmp(type, "sum")) {
                current_metric->type = TYPE_SUM;
                current_metric->acc = malloc(sizeof(double));
                current_metric->result = malloc(sizeof(double));
                *((double *)current_metric->result) = 0.0;
+               current_metric->output_format = "%s=%.2f\n";
            } else if (!strcmp(type, "count")) {
                current_metric->type = TYPE_COUNT;
                current_metric->acc = NULL;
                current_metric->result = malloc(sizeof(unsigned long));
                *((unsigned long *)current_metric->result) = 0;
+               current_metric->output_format = "%s=%lu\n";
+           }
+           
+           if (output_format != NULL) {
+               asprintf(&current_metric->output_format, "%%s=%s\n", output_format);
+               if(current_metric->output_format == NULL) {
+                   printf("Cannot allocate memory for metric\n");
+                   exit(1);
+               }
            }
 
            const char *pcre_error;
@@ -310,6 +325,12 @@ struct daemon_config parse_config(char *config_filename)
         }
     }
             
+    for (i = 0; i < elem_count; i++) { 
+        free(tree[i]->key);
+        free(tree[i]->value);
+        free(tree[i]);
+    }
+
     return cfg;
 }
 

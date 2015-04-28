@@ -27,16 +27,16 @@ void *responder(void *p)
     for (metric = 0; metric < parser->metrics_count; metric++) {
       struct metric *m  = &parser->metrics[metric];
       if (m->type == TYPE_LASTVALUE) {
-        int bytes = snprintf(buff, BUFF_SIZE, "%s=%s\n", m->name, (char *)m->result);
+        int bytes = snprintf(buff, BUFF_SIZE, m->output_format, m->name, (char *)m->result);
         write(param->fd, buff, bytes);
       } else if (m->type == TYPE_COUNT) {
-        int bytes = snprintf(buff, BUFF_SIZE, "%s=%lu\n", m->name, *((unsigned long *)m->result));
+        int bytes = snprintf(buff, BUFF_SIZE, m->output_format, m->name, *((unsigned long *)m->result));
         write(param->fd, buff, bytes);
       } else if (m->type == TYPE_RPS) {
-        int bytes = snprintf(buff, BUFF_SIZE, "%s=%.2f\n", m->name, *((double *)m->result));
+        int bytes = snprintf(buff, BUFF_SIZE, m->output_format, m->name, *((double *)m->result));
         write(param->fd, buff, bytes);
       } else if (m->type == TYPE_SUM) {
-        int bytes = snprintf(buff, BUFF_SIZE, "%s=%.2f\n", m->name, *((double *)m->result));
+        int bytes = snprintf(buff, BUFF_SIZE, m->output_format, m->name, *((double *)m->result));
         write(param->fd, buff, bytes);
       }
     }

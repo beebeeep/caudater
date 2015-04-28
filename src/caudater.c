@@ -464,8 +464,8 @@ int main(int argc, char *argv[])
             printf ("Unknown parser type!\n");
             exit(-1);
         }
-      pthread_attr_init(&config.parsers[i].thread_attr);
-      pthread_attr_setdetachstate(&config.parsers[i].thread_attr, PTHREAD_CREATE_DETACHED);
+        pthread_attr_init(&config.parsers[i].thread_attr);
+        pthread_attr_setdetachstate(&config.parsers[i].thread_attr, PTHREAD_CREATE_DETACHED);
         if (pthread_create(&config.parsers[i].thread_id, &config.parsers[i].thread_attr, parser_worker, (void *) &config.parsers[i]) != 0) {
             perror("Cannot start thread");
             exit(-1);

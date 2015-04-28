@@ -24,6 +24,7 @@ struct metric {
     int type;                   /* variable type */
     char *pattern;              /* regexp for input filtering */
     char *ignore_pattern;       /* regexp to filter out output of previous regexp */
+    char *output_format;        /* printf format string for result output */
     pcre *re;
     pcre_extra *re_extra;
     pcre *ignore_re;
