@@ -1,3 +1,9 @@
+caudater (0.16) precise; urgency=low
+
+  * Added 'output_format' option to metric settings (CHEMODAN-21412)
+
+ -- Migalin Daniil <dmiga@yandex-team.ru>  Thu, 30 Apr 2015 13:52:57 +0400
+
 caudater (0.15) precise; urgency=low
 
   * Start at runlevel 2

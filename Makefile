@@ -2,7 +2,7 @@ TARGET=caudater
 LIBS=-lyaml -lpthread -lpcre -lcurl
 
 CC ?= gcc
-CFLAGS += -std=gnu99 -Wall -pedantic -DUSE_YAML_CONFIG
+CFLAGS += -std=gnu99 -Wall -pedantic -DUSE_YAML_CONFIG -g
 INSTALL ?= install
 
 OBJECTS = $(patsubst %.c, %.o, $(wildcard src/*.c))

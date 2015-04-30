@@ -170,7 +170,7 @@ struct daemon_config parse_config(char *config_filename)
         kv_elem *c = tree[i];
         
 #ifdef DEBUG
-        printf("Elem %p:\tkey=%s, value=%s, parent = %s\n", (void *)c, c->key, (c->value != NULL)?c->value:"NULL", (c->parent != NULL)?c->parent->key:"NULL");
+        printf("Elem %p:\tkey=%s, value=%s, parent = %s (%p)\n", (void *)c, c->key, (c->value != NULL)?c->value:"NULL", (c->parent != NULL)?c->parent->key:"NULL", (void *)c->parent);
 #endif
         
         if(c->parent == NULL) continue;
@@ -285,7 +285,9 @@ struct daemon_config parse_config(char *config_filename)
            }
            
            if (output_format != NULL) {
-               asprintf(&current_metric->output_format, "%%s=%s\n", output_format);
+               size_t s = strlen(output_format) + 6;
+               current_metric->output_format = (char *)malloc(s);
+               snprintf(current_metric->output_format, s, "%%s=%s\n", output_format);
                if(current_metric->output_format == NULL) {
                    printf("Cannot allocate memory for metric\n");
                    exit(1);
@@ -324,8 +326,7 @@ struct daemon_config parse_config(char *config_filename)
 
         }
     }
-            
-    for (i = 0; i < elem_count; i++) { 
+    for (i = 1; i < elem_count; i++) { // do not try to free HEAD element
         free(tree[i]->key);
         free(tree[i]->value);
         free(tree[i]);
